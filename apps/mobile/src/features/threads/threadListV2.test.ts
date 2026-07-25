@@ -263,19 +263,66 @@ describe("sortThreadsForListV2", () => {
 });
 
 describe("buildThreadListV2Items", () => {
-  it("keeps a merged thread active when auto-settle on merge is off", () => {
-    const merged = makeThread({ id: ThreadId.make("merged"), title: "Merged" });
+  it("excludes subagent child threads from top-level rows and counts", () => {
+    const rootThreadId = ThreadId.make("root");
+    const activeChildId = ThreadId.make("active-child");
+    const forkId = ThreadId.make("fork");
+    const settledChildId = ThreadId.make("settled-child");
+    const snoozedChildId = ThreadId.make("snoozed-child");
     const layout = buildThreadListV2Items({
-      threads: [merged],
+      threads: [
+        makeThread({ id: rootThreadId, title: "Root" }),
+        makeThread({
+          id: forkId,
+          title: "Fork",
+          lineage: {
+            rootThreadId,
+            parentThreadId: rootThreadId,
+            relationshipToParent: "fork",
+          },
+        }),
+        makeThread({
+          id: activeChildId,
+          title: "Active child",
+          lineage: {
+            rootThreadId,
+            parentThreadId: rootThreadId,
+            relationshipToParent: "subagent",
+          },
+        }),
+        makeThread({
+          id: settledChildId,
+          title: "Settled child",
+          lineage: {
+            rootThreadId,
+            parentThreadId: rootThreadId,
+            relationshipToParent: "subagent",
+          },
+          settledOverride: "settled",
+          settledAt: "2026-06-01T12:00:00.000Z",
+        }),
+        makeThread({
+          id: snoozedChildId,
+          title: "Snoozed child",
+          lineage: {
+            rootThreadId,
+            parentThreadId: rootThreadId,
+            relationshipToParent: "subagent",
+          },
+          snoozedUntil: "2026-06-03T09:00:00.000Z",
+          snoozedAt: "2026-06-01T12:00:00.000Z",
+        }),
+      ],
       environmentId: null,
       searchQuery: "",
-      changeRequestStateByKey: new Map([[`${environmentId}:${merged.id}`, "merged"]]),
-      autoSettleOnMerge: false,
       now: NOW,
+      settledLimit: 0,
     });
 
-    expect(layout.items.map((item) => item.thread.id)).toEqual(["merged"]);
-    expect(layout.settledCount).toBe(0);
+    expect(layout.items.map((item) => item.thread.id)).toEqual([forkId, rootThreadId]);
+    expect(layout.hiddenSettledCount).toBe(0);
+    expect(layout.snoozedCount).toBe(0);
+    expect(layout.nextSnoozeWakeAt).toBeNull();
   });
 
   it("hides snoozed threads and counts them — visibility parity with web", () => {
