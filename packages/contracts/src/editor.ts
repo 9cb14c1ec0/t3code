@@ -123,6 +123,11 @@ export const RemoteOpenTarget = Schema.Struct({
 });
 export type RemoteOpenTarget = typeof RemoteOpenTarget.Type;
 
+export const RevealInFileManagerInput = Schema.Struct({
+  path: TrimmedNonEmptyString,
+});
+export type RevealInFileManagerInput = typeof RevealInFileManagerInput.Type;
+
 export class ExternalLauncherUnknownEditorError extends Schema.TaggedErrorClass<ExternalLauncherUnknownEditorError>()(
   "ExternalLauncherUnknownEditorError",
   {
