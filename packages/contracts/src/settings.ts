@@ -549,9 +549,7 @@ export const ServerSettings = Schema.Struct({
   threadAutoSettleAfterDays: Schema.NullOr(ThreadAutoSettleAfterDays).pipe(
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_THREAD_AUTO_SETTLE_AFTER_DAYS)),
   ),
-  threadAutoSettleOnMerge: Schema.Boolean.pipe(
-    Schema.withDecodingDefault(Effect.succeed(true)),
-  ),
+  threadAutoSettleOnMerge: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
   backgroundActivity: BackgroundActivitySettings,
   // Legacy flat fields retained for old settings files and old clients. New
   // consumers should resolve `backgroundActivity` instead.

@@ -490,8 +490,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       DEFAULT_UNIFIED_SETTINGS.sidebarProjectGroupingMode
         ? ["Project Grouping"]
         : []),
-      ...(settings.threadAutoSettleAfterDays !==
-      DEFAULT_UNIFIED_SETTINGS.threadAutoSettleAfterDays
+      ...(settings.threadAutoSettleAfterDays !== DEFAULT_UNIFIED_SETTINGS.threadAutoSettleAfterDays
         ? ["Auto-settle inactive threads"]
         : []),
       ...(settings.threadAutoSettleOnMerge !== DEFAULT_UNIFIED_SETTINGS.threadAutoSettleOnMerge

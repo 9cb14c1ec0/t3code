@@ -9,6 +9,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import {
   resolveAutomaticSettlementReason,
+  resolveAutomaticSettlementVerdict,
   shellHasQueuedTurnStart,
   threadLastActivityAt,
 } from "./threadSettlement.ts";
@@ -102,9 +103,7 @@ describe("resolveAutomaticSettlementReason", () => {
     expect(resolve(pinned, { changeRequestState: "open" })).toBeNull();
     expect(resolve(pinned, { changeRequestState: "closed" })).toBeNull();
     expect(resolve(pinned, { changeRequestState: "merged" })).toBe("pr-merged");
-    expect(
-      resolve(pinned, { changeRequestState: "merged", autoSettleOnMerge: false }),
-    ).toBeNull();
+    expect(resolve(pinned, { changeRequestState: "merged", autoSettleOnMerge: false })).toBeNull();
   });
 
   it("does not treat a closed PR as an immediate settlement signal", () => {
@@ -162,6 +161,74 @@ describe("resolveAutomaticSettlementReason", () => {
         mergedOptions,
       ),
     ).toBeNull();
+  });
+});
+
+describe("resolveAutomaticSettlementVerdict", () => {
+  it("re-verifies cached or unknown PR state even for pinned threads", () => {
+    const pinned = makeShell({
+      activityAt: FRESH,
+      pinnedAt: "2026-04-07T00:00:00.000Z",
+    });
+
+    for (const changeRequestState of ["unknown", "open-cached", "closed-cached"] as const) {
+      expect(
+        resolveAutomaticSettlementVerdict(pinned, {
+          now: NOW,
+          autoSettleAfterDays: 3,
+          autoSettleOnMerge: true,
+          changeRequestState,
+        }),
+      ).toEqual({ kind: "verify-pr" });
+    }
+  });
+
+  it("does not look up PR state for pins when merge settlement is disabled", () => {
+    const pinned = makeShell({
+      activityAt: FRESH,
+      pinnedAt: "2026-04-07T00:00:00.000Z",
+    });
+
+    expect(
+      resolveAutomaticSettlementVerdict(pinned, {
+        now: NOW,
+        autoSettleAfterDays: 3,
+        autoSettleOnMerge: false,
+        changeRequestState: "open-cached",
+      }),
+    ).toEqual({ kind: "skip" });
+  });
+
+  it("does not re-verify terminal live states", () => {
+    const pinned = makeShell({
+      activityAt: STALE,
+      pinnedAt: "2026-04-07T00:00:00.000Z",
+    });
+
+    expect(
+      resolveAutomaticSettlementVerdict(pinned, {
+        now: NOW,
+        autoSettleAfterDays: 3,
+        autoSettleOnMerge: true,
+        changeRequestState: "closed",
+      }),
+    ).toEqual({ kind: "skip" });
+    expect(
+      resolveAutomaticSettlementVerdict(pinned, {
+        now: NOW,
+        autoSettleAfterDays: 3,
+        autoSettleOnMerge: true,
+        changeRequestState: "merged",
+      }),
+    ).toEqual({ kind: "settle", reason: "pr-merged" });
+    expect(
+      resolveAutomaticSettlementVerdict(pinned, {
+        now: NOW,
+        autoSettleAfterDays: 3,
+        autoSettleOnMerge: false,
+        changeRequestState: "merged",
+      }),
+    ).toEqual({ kind: "skip" });
   });
 });
 
