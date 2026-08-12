@@ -151,6 +151,7 @@ minimumReleaseAgeExclude:
   - expo-application@58.0.3
   - expo-eas-client@58.0.2
   - expo-image-loader@58.0.3
+  - expo-speech@58.0.3
 
 overrides:
   # Keep jsdom's optional peer consistent so Vite+ has one test-runner instance.
