@@ -129,6 +129,8 @@ import {
   type MediaVideoPreviewSource,
 } from "../../lib/videoPreviewSource";
 import { CopyTextButton } from "../../components/CopyTextButton";
+import { SpeakTextButton } from "../../components/SpeakTextButton";
+import { useAutoReadAgentReplies } from "./use-auto-read-agent-replies";
 import { parseReviewCommentMessageSegments } from "../review/reviewCommentSelection";
 import type { ReviewDiffTheme } from "../review/shikiReviewHighlighter";
 import {
@@ -1946,6 +1948,12 @@ function renderFeedEntry(
               buttonSize={28}
               iconSize={13}
             />
+            <SpeakTextButton
+              text={message.text}
+              tintColor={iconSubtleColor}
+              buttonSize={28}
+              iconSize={13}
+            />
             {message.projectedItem ? (
               <AssistantForkButton
                 environmentId={props.environmentId}
@@ -2751,6 +2759,12 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
     }
     return new Set(terminalIdsByTurn.values());
   }, [props.feed]);
+  useAutoReadAgentReplies({
+    feed: props.feed,
+    terminalAssistantMessageIds,
+    unsettledRunId: unsettledTurnId,
+  });
+
   useEffect(() => {
     const previous = previousLatestTurnRef.current;
     previousLatestTurnRef.current = props.latestRun;
