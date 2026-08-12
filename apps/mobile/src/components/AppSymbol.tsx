@@ -80,6 +80,7 @@ import IconTool from "@tabler/icons-react-native/IconTool";
 import IconTrash from "@tabler/icons-react-native/IconTrash";
 import IconTypography from "@tabler/icons-react-native/IconTypography";
 import IconUserCircle from "@tabler/icons-react-native/IconUserCircle";
+import IconVolume from "@tabler/icons-react-native/IconVolume";
 import IconWifiOff from "@tabler/icons-react-native/IconWifiOff";
 import IconWorld from "@tabler/icons-react-native/IconWorld";
 import IconX from "@tabler/icons-react-native/IconX";
@@ -148,6 +149,7 @@ const ANDROID_ICON_BY_SF_SYMBOL: Partial<Record<SFSymbol, Icon>> = {
   "sidebar.left": IconLayoutSidebar,
   "sidebar.right": IconLayoutSidebarRight,
   "slider.horizontal.3": IconAdjustmentsHorizontal,
+  "speaker.wave.2": IconVolume,
   "square.and.pencil": IconEdit,
   "square.grid.2x2": IconApps,
   "square.split.2x1": IconLayoutColumns,
