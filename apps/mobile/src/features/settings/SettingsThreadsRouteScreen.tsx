@@ -43,11 +43,37 @@ export function SettingsThreadsRouteScreen() {
           contentContainerClassName="gap-6 px-5 pt-4"
           contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 18) + 18 }}
         >
+          <ReadAloudSettingsSection />
           <AutoSettleSettingsRows />
           <LegacySettingsSection />
         </ScrollView>
       </SettingsScreen>
     </>
+  );
+}
+
+function ReadAloudSettingsSection() {
+  const preferencesResult = useAtomValue(mobilePreferencesAtom);
+  const savePreferences = useAtomSet(updateMobilePreferencesAtom);
+  const autoReadEnabled = AsyncResult.isSuccess(preferencesResult)
+    ? (preferencesResult.value.autoReadAgentRepliesEnabled ?? false)
+    : false;
+
+  return (
+    <View className="gap-3">
+      <SettingsSection title="Read aloud">
+        <SettingsSwitchRow
+          icon="speaker.wave.2"
+          label="Read Replies Aloud"
+          value={autoReadEnabled}
+          onValueChange={(value) => savePreferences({ autoReadAgentRepliesEnabled: value })}
+        />
+      </SettingsSection>
+      <Text className="px-2 text-sm text-foreground-muted">
+        Speaks agent replies as they complete in the thread you are viewing, using the device
+        text-to-speech voice.
+      </Text>
+    </View>
   );
 }
 
