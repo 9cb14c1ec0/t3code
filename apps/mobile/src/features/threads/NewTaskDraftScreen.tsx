@@ -54,7 +54,10 @@ import { resolveSelectableModelSelection } from "../../lib/modelOptions";
 import { deriveThreadTitleFromPrompt } from "../../lib/projectThreadStartTurn";
 import { armAgentAwarenessLiveActivityForLocalWork } from "../agent-awareness/remoteRegistration";
 import { enqueueThreadOutboxMessage, removeThreadOutboxMessage } from "../../state/thread-outbox";
-import { useRemoteConnectionStatus } from "../../state/use-remote-environment-registry";
+import {
+  setPendingConnectionError,
+  useRemoteConnectionStatus,
+} from "../../state/use-remote-environment-registry";
 import { useNewTaskFlow } from "./new-task-flow-provider";
 import { useCreateProjectThread } from "./use-project-actions";
 import { resolveDraftProjectSelection } from "./new-task-project-selection";
@@ -606,6 +609,9 @@ export function NewTaskDraftScreen(props: {
     const result = await pickComposerImages({ existingCount: flow.attachments.length });
     if (result.images.length > 0) {
       flow.appendAttachments(result.images);
+    }
+    if (result.error) {
+      setPendingConnectionError(result.error);
     }
   }
 
