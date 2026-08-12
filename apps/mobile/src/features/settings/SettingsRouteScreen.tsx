@@ -534,19 +534,36 @@ function GeneralSettingsSection() {
   const connections = Object.values(savedConnectionsById).sort((left, right) =>
     left.environmentLabel.localeCompare(right.environmentLabel),
   );
+  const preferencesResult = useAtomValue(mobilePreferencesAtom);
+  const savePreferences = useAtomSet(updateMobilePreferencesAtom);
+  const autoReadEnabled = AsyncResult.isSuccess(preferencesResult)
+    ? (preferencesResult.value.autoReadAgentRepliesEnabled ?? false)
+    : false;
 
   return (
-    <SettingsSection title="General">
-      <SettingsRow icon="folder" label="Project Grouping" target="SettingsProjectGrouping" />
-      {connections.map((connection) => (
-        <EnvironmentAutoSettleSwitch
-          key={connection.environmentId}
-          environmentId={connection.environmentId}
-          environmentLabel={connection.environmentLabel}
+    <View className="gap-3">
+      <SettingsSection title="General">
+        <SettingsRow icon="folder" label="Project Grouping" target="SettingsProjectGrouping" />
+        {connections.map((connection) => (
+          <EnvironmentAutoSettleSwitch
+            key={connection.environmentId}
+            environmentId={connection.environmentId}
+            environmentLabel={connection.environmentLabel}
+          />
+        ))}
+        <SettingsRow icon="chart.bar.xaxis" label="Usage" target="SettingsUsage" />
+        <SettingsSwitchRow
+          icon="speaker.wave.2"
+          label="Read Replies Aloud"
+          value={autoReadEnabled}
+          onValueChange={(value) => savePreferences({ autoReadAgentRepliesEnabled: value })}
         />
-      ))}
-      <SettingsRow icon="chart.bar.xaxis" label="Usage" target="SettingsUsage" />
-    </SettingsSection>
+      </SettingsSection>
+      <Text className="px-2 text-sm text-foreground-muted">
+        Speaks agent replies as they complete in the thread you are viewing, using the device
+        text-to-speech voice.
+      </Text>
+    </View>
   );
 }
 
