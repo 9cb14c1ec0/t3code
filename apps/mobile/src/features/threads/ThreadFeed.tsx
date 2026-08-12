@@ -160,8 +160,10 @@ import { attachmentVideoPreviewSource } from "../../lib/videoPreviewSource";
 import { CopyTextButton } from "./CopyTextButton";
 import { getReviewSectionIdForCheckpoint } from "../review/reviewModel";
 import { setReviewSelectedSectionId } from "../review/reviewState";
+import { SpeakTextButton } from "../../components/SpeakTextButton";
 import { Menu } from "../../components/ui/Menu";
 import { copyPromptLink } from "../prompt-links/prompt-link-actions";
+import { useAutoReadAgentReplies } from "./use-auto-read-agent-replies";
 import { parseReviewCommentMessageSegments } from "../review/reviewCommentSelection";
 import {
   ReviewCommentCard,
@@ -1789,6 +1791,12 @@ function renderFeedEntry(
               buttonSize={28}
               iconSize={13}
             />
+            <SpeakTextButton
+              text={message.text}
+              tintColor={iconSubtleColor}
+              buttonSize={28}
+              iconSize={13}
+            />
             {message.projectedItem ? (
               <AssistantForkButton
                 environmentId={props.environmentId}
@@ -2851,6 +2859,12 @@ export const ThreadFeed = memo(function ThreadFeed({
     }
     return new Set(terminalIdsByTurn.values());
   })();
+  useAutoReadAgentReplies({
+    feed: props.feed,
+    terminalAssistantMessageIds,
+    unsettledRunId: unsettledTurnId,
+  });
+
   // An interrupted run unfolds; a run that is no longer latest folds back.
   const [previousLatestRun, setPreviousLatestRun] = useState(props.latestRun);
   if (previousLatestRun !== props.latestRun) {
