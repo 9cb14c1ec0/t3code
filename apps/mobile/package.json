@@ -96,6 +96,7 @@
     "expo-quick-actions": "^6.0.2",
     "expo-secure-store": "~56.0.4",
     "expo-sharing": "~56.0.18",
+    "expo-speech": "~56.0.3",
     "expo-splash-screen": "~56.0.10",
     "expo-sqlite": "~56.0.5",
     "expo-symbols": "~56.0.6",
