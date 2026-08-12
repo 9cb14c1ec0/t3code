@@ -532,18 +532,33 @@ function GeneralSettingsSection() {
   const autoSettleOnMerge =
     !AsyncResult.isSuccess(preferencesResult) ||
     preferencesResult.value.autoSettleOnMerge !== false;
+  const autoReadEnabled = AsyncResult.isSuccess(preferencesResult)
+    ? (preferencesResult.value.autoReadAgentRepliesEnabled ?? false)
+    : false;
 
   return (
-    <SettingsSection title="General">
-      <SettingsRow icon="folder" label="Project Grouping" target="SettingsProjectGrouping" />
-      <SettingsSwitchRow
-        icon="arrow.triangle.branch"
-        label="Auto-settle merged threads"
-        value={autoSettleOnMerge}
-        onValueChange={(value) => savePreferences({ autoSettleOnMerge: value })}
-      />
-      <SettingsRow icon="chart.bar.xaxis" label="Usage" target="SettingsUsage" />
-    </SettingsSection>
+    <View className="gap-3">
+      <SettingsSection title="General">
+        <SettingsRow icon="folder" label="Project Grouping" target="SettingsProjectGrouping" />
+        <SettingsSwitchRow
+          icon="arrow.triangle.branch"
+          label="Auto-settle merged threads"
+          value={autoSettleOnMerge}
+          onValueChange={(value) => savePreferences({ autoSettleOnMerge: value })}
+        />
+        <SettingsRow icon="chart.bar.xaxis" label="Usage" target="SettingsUsage" />
+        <SettingsSwitchRow
+          icon="speaker.wave.2"
+          label="Read Replies Aloud"
+          value={autoReadEnabled}
+          onValueChange={(value) => savePreferences({ autoReadAgentRepliesEnabled: value })}
+        />
+      </SettingsSection>
+      <Text className="px-2 text-sm text-foreground-muted">
+        Speaks agent replies as they complete in the thread you are viewing, using the device
+        text-to-speech voice.
+      </Text>
+    </View>
   );
 }
 
