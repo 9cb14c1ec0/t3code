@@ -99,6 +99,8 @@ import { AppText as Text } from "../../components/AppText";
 import { VideoPreviewModal, type VideoPreviewSource } from "../../components/VideoPreviewModal";
 import { VideoAttachmentTile } from "../../components/VideoAttachmentTile";
 import { CopyTextButton } from "../../components/CopyTextButton";
+import { SpeakTextButton } from "../../components/SpeakTextButton";
+import { useAutoReadAgentReplies } from "./use-auto-read-agent-replies";
 import {
   parseReviewCommentMessageSegments,
   type ReviewInlineComment,
@@ -1534,6 +1536,12 @@ function renderFeedEntry(
               buttonSize={28}
               iconSize={13}
             />
+            <SpeakTextButton
+              text={message.text}
+              tintColor={iconSubtleColor}
+              buttonSize={28}
+              iconSize={13}
+            />
             <Text className="font-t3-medium text-xs tabular-nums text-adaptive-neutral-600-400">
               {timestampLabel}
             </Text>
@@ -2250,6 +2258,12 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
     (props.latestTurn.completedAt === null || props.latestTurn.state === "running")
       ? props.latestTurn.turnId
       : null;
+
+  useAutoReadAgentReplies({
+    feed: props.feed,
+    terminalAssistantMessageIds,
+    unsettledTurnId,
+  });
 
   useEffect(() => {
     const previous = previousLatestTurnRef.current;
