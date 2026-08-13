@@ -32,6 +32,7 @@ import { refreshManagedRelayEnvironments } from "../cloud/managedRelayState";
 import { hasCloudPublicConfig, resolveRelayClerkTokenOptions } from "../cloud/publicConfig";
 import { withNativeGlassHeaderItem } from "../layout/native-glass-header-items";
 import { WorkspaceSidebarToolbar } from "../layout/workspace-sidebar-toolbar";
+import { environmentCatalog } from "../../connection/catalog";
 import { runtime } from "../../lib/runtime";
 import { useThemeColor } from "../../lib/useThemeColor";
 import { mobilePreferencesAtom, updateMobilePreferencesAtom } from "../../state/preferences";
@@ -524,17 +525,26 @@ function ConfiguredSettingsRouteScreen() {
 }
 
 function GeneralSettingsSection() {
+  const environmentCatalogState = useAtomValue(environmentCatalog.catalogValueAtom);
   const serverConfigs = useAtomValue(environmentServerConfigsAtom);
   const updateServerSettings = useAtomCommand(
     serverEnvironment.updateSettings,
     "server settings update",
   );
-  const environmentIds = useMemo(() => [...serverConfigs.keys()], [serverConfigs]);
+  const environmentIds = useMemo(
+    () => [...environmentCatalogState.entries.keys()],
+    [environmentCatalogState.entries],
+  );
+  const allServerConfigsAvailable =
+    environmentCatalogState.isReady &&
+    environmentIds.length > 0 &&
+    environmentIds.every((environmentId) => serverConfigs.has(environmentId));
   const autoSettleOnMerge = environmentIds.every(
     (environmentId) => serverConfigs.get(environmentId)?.settings.threadAutoSettleOnMerge !== false,
   );
   const handleAutoSettleOnMergeChange = useCallback(
     (value: boolean) => {
+      if (!allServerConfigsAvailable) return;
       for (const environmentId of environmentIds) {
         void updateServerSettings({
           environmentId,
@@ -542,7 +552,7 @@ function GeneralSettingsSection() {
         });
       }
     },
-    [environmentIds, updateServerSettings],
+    [allServerConfigsAvailable, environmentIds, updateServerSettings],
   );
 
   return (
@@ -551,7 +561,7 @@ function GeneralSettingsSection() {
       <SettingsSwitchRow
         icon="arrow.triangle.branch"
         label="Auto-settle merged threads"
-        disabled={environmentIds.length === 0}
+        disabled={!allServerConfigsAvailable}
         value={autoSettleOnMerge}
         onValueChange={handleAutoSettleOnMergeChange}
       />
