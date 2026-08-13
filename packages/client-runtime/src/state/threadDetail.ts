@@ -66,6 +66,12 @@ export function createEnvironmentThreadDetailAtoms<E>(
       Atom.withLabel(`environment-thread-error:${key}`),
     ),
   );
+  const historyAtomFamily = Atom.family((key: string) =>
+    Atom.make((get) => get(threadStateValueAtomFamily(key)).history).pipe(
+      Atom.setIdleTTL(THREAD_STATE_IDLE_TTL_MS),
+      Atom.withLabel(`environment-thread-history:${key}`),
+    ),
+  );
 
   return {
     stateAtom: (ref: ScopedThreadRef) => threadStateValueAtomFamily(threadKey(ref)),
@@ -73,5 +79,6 @@ export function createEnvironmentThreadDetailAtoms<E>(
     visibleTurnItemsAtom: (ref: ScopedThreadRef) => visibleTurnItemsAtomFamily(threadKey(ref)),
     statusAtom: (ref: ScopedThreadRef) => statusAtomFamily(threadKey(ref)),
     errorAtom: (ref: ScopedThreadRef) => errorAtomFamily(threadKey(ref)),
+    historyAtom: (ref: ScopedThreadRef) => historyAtomFamily(threadKey(ref)),
   };
 }
