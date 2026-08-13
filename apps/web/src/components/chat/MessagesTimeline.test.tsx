@@ -1070,7 +1070,7 @@ describe("MessagesTimeline", () => {
     expect(markup).not.toContain("Work Log");
   });
 
-  it("renders live subagent progress on the persistent linked card", async () => {
+  it("renders a live subagent as an Agents-panel CTA", async () => {
     const { MessagesTimeline } = await import("./MessagesTimeline");
     const markup = renderToStaticMarkup(
       <MessagesTimeline
@@ -1117,14 +1117,18 @@ describe("MessagesTimeline", () => {
     );
 
     expect(markup).toContain('data-v2-item-type="subagent"');
+    expect(markup).toContain('data-agent-spawn-cta="true"');
     expect(markup).not.toContain('aria-label="Open Package audit"');
-    expect(markup).toContain("Reading src/index.ts");
+    expect(markup).toContain("Kicked off 1 subagent");
+    expect(markup).toContain("1 working");
+    expect(markup).toContain("Open Agents");
+    expect(markup).not.toContain("Reading src/index.ts");
     expect(markup).not.toContain("Inspect the package");
     expect(markup).not.toContain('data-v2-subagent-result-disclosure="true"');
     expect(markup).not.toContain("Work Log");
   });
 
-  it("discloses the full Codex subagent result without projecting child events", async () => {
+  it("keeps completed subagent detail in the Agents panel", async () => {
     const { MessagesTimeline } = await import("./MessagesTimeline");
     const markup = renderToStaticMarkup(
       <MessagesTimeline
@@ -1170,16 +1174,18 @@ describe("MessagesTimeline", () => {
     );
 
     expect(markup).toContain('data-v2-item-type="subagent"');
-    expect(markup).toContain('data-v2-subagent-result-disclosure="true"');
-    expect(markup).toContain('data-v2-subagent-result="true"');
-    expect(markup).toContain('aria-label="Show full result for Isolation report"');
+    expect(markup).toContain("Ran 1 subagent");
+    expect(markup).toContain("completed");
+    expect(markup).toContain("View");
+    expect(markup).not.toContain('data-v2-subagent-result-disclosure="true"');
+    expect(markup).not.toContain('data-v2-subagent-result="true"');
     expect(markup).not.toContain('aria-label="Open Isolation report"');
-    expect(markup).toContain("Tests should be isolated.");
-    expect(markup).toContain("Result: no shared state.");
+    expect(markup).not.toContain("Tests should be isolated.");
+    expect(markup).not.toContain("Result: no shared state.");
     expect(markup).not.toContain("Explain test isolation");
   });
 
-  it("keeps live progress when a running subagent streams a partial result", async () => {
+  it("keeps streaming subagent detail out of the CTA roster summary", async () => {
     const { MessagesTimeline } = await import("./MessagesTimeline");
     const markup = renderToStaticMarkup(
       <MessagesTimeline
@@ -1227,12 +1233,14 @@ describe("MessagesTimeline", () => {
 
     expect(markup).toContain('data-v2-item-type="subagent"');
     expect(markup).not.toContain('aria-label="Open Package audit"');
-    expect(markup).toContain("Reading src/index.ts");
+    expect(markup).toContain("Kicked off 1 subagent");
+    expect(markup).toContain("Open Agents");
+    expect(markup).not.toContain("Reading src/index.ts");
     expect(markup).not.toContain("Partial streamed answer so far");
     expect(markup).not.toContain('data-v2-subagent-result-disclosure="true"');
   });
 
-  it("shows the streamed result while a subagent runs without progress", async () => {
+  it("keeps a streamed result in the Agents panel while the CTA stays compact", async () => {
     const { MessagesTimeline } = await import("./MessagesTimeline");
     const markup = renderToStaticMarkup(
       <MessagesTimeline
@@ -1279,12 +1287,14 @@ describe("MessagesTimeline", () => {
     );
 
     expect(markup).toContain('data-v2-item-type="subagent"');
-    expect(markup).toContain("Streaming answer so far");
+    expect(markup).toContain("Kicked off 1 subagent");
+    expect(markup).toContain("Open Agents");
+    expect(markup).not.toContain("Streaming answer so far");
     expect(markup).not.toContain("Inspect the package");
     expect(markup).not.toContain('data-v2-subagent-result-disclosure="true"');
   });
 
-  it("treats a cancelled subagent result as partial output", async () => {
+  it("renders a cancelled subagent batch as stopped", async () => {
     const { MessagesTimeline } = await import("./MessagesTimeline");
     const markup = renderToStaticMarkup(
       <MessagesTimeline
@@ -1331,12 +1341,14 @@ describe("MessagesTimeline", () => {
     );
 
     expect(markup).toContain('data-v2-item-type="subagent"');
-    expect(markup).toContain("Partial output before cancel");
+    expect(markup).toContain("Ran 1 subagent");
+    expect(markup).toContain("1 stopped");
+    expect(markup).not.toContain("Partial output before cancel");
     expect(markup).not.toContain("Reading src/index.ts");
     expect(markup).not.toContain('data-v2-subagent-result-disclosure="true"');
   });
 
-  it("falls back to progress when a completed subagent result is whitespace-only", async () => {
+  it("renders a completed subagent batch without inline progress", async () => {
     const { MessagesTimeline } = await import("./MessagesTimeline");
     const markup = renderToStaticMarkup(
       <MessagesTimeline
@@ -1383,7 +1395,9 @@ describe("MessagesTimeline", () => {
     );
 
     expect(markup).toContain('data-v2-item-type="subagent"');
-    expect(markup).toContain("Audited 12 packages");
+    expect(markup).toContain("Ran 1 subagent");
+    expect(markup).toContain("completed");
+    expect(markup).not.toContain("Audited 12 packages");
     expect(markup).not.toContain('data-v2-subagent-result-disclosure="true"');
   });
 
