@@ -279,7 +279,6 @@ it.effect("does not settle when PR verification fails or belongs to another bran
         id: "mismatched-merge",
         branch: "feature/current",
         cwd: "/repo/mismatched",
-        pinned: true,
       });
       const { reactor, dispatched } = yield* makeHarness({
         threads: [lookupFailed, mismatchedMerge],

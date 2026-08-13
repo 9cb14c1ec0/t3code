@@ -68,7 +68,7 @@ function liveChangeRequestState(
   status: VcsStatusResult,
 ): AutomaticSettlementChangeRequestState {
   if (thread.branch === null) return null;
-  if (status.refName !== thread.branch || status.pr?.headRef !== thread.branch) return null;
+  if (status.refName !== thread.branch || status.pr?.headRef !== thread.branch) return "unknown";
   return status.pr.state;
 }
 
