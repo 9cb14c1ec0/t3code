@@ -278,7 +278,6 @@ export interface ClaudeAgentSdkQuerySession {
   readonly offer: (message: SDKUserMessage) => Effect.Effect<void, ClaudeAgentSdkQueryRunnerError>;
   readonly setModel: (model: string) => Effect.Effect<void, ClaudeAgentSdkQueryRunnerError>;
   readonly interrupt: Effect.Effect<void, ClaudeAgentSdkQueryRunnerError>;
-  readonly stopTask: (taskId: string) => Effect.Effect<void, ClaudeAgentSdkQueryRunnerError>;
   readonly close: Effect.Effect<void, ClaudeAgentSdkQueryRunnerError>;
 }
 
@@ -601,37 +600,6 @@ export const claudeAgentSdkQueryRunnerLiveLayer: Layer.Layer<
               }),
             ),
           ),
-          stopTask: (taskId) =>
-            Effect.suspend(() => {
-              // stopTask is deliberate wire surface (the CLI's own
-              // /workflows view stops through it) but absent from the
-              // published SDK types — this cast is the single place the
-              // undocumented method is read.
-              const stop = (queryRuntime as { stopTask?: (taskId: string) => Promise<void> })
-                .stopTask;
-              return stop === undefined
-                ? Effect.fail(
-                    new ClaudeAgentSdkQueryRunnerError({
-                      method: "stopTask",
-                      cause: "The Claude SDK runtime for this session does not expose stopTask.",
-                    }),
-                  )
-                : Effect.tryPromise({
-                    try: () => stop.call(queryRuntime, taskId),
-                    catch: (cause) => queryRunnerError(cause, "stopTask"),
-                  });
-            }).pipe(
-              Effect.tap(() =>
-                logProtocolEvent({
-                  direction: "outgoing",
-                  stage: "decoded",
-                  payload: {
-                    type: "task.stop",
-                    taskId,
-                  },
-                }),
-              ),
-            ),
           close: Queue.shutdown(promptQueue).pipe(
             Effect.andThen(closeClaudeQuery(queryRuntime)),
             Effect.tap(() =>
@@ -5259,28 +5227,6 @@ export function makeClaudeAdapterV2(
           startTurn,
           steerTurn,
           interruptTurn,
-          stopTask: Effect.fn("ClaudeAdapterV2.stopTask")(function* (stopInput: {
-            readonly nativeTaskId: string;
-          }) {
-            const existing = yield* Ref.get(queryContext);
-            if (existing === null) {
-              yield* Effect.logWarning("orchestration-v2.claude-stop-task-without-live-query", {
-                providerSessionId: input.providerSessionId,
-                nativeTaskId: stopInput.nativeTaskId,
-              });
-              return;
-            }
-            yield* existing.query.stopTask(stopInput.nativeTaskId).pipe(
-              Effect.mapError(
-                (cause) =>
-                  new ProviderAdapterProtocolError({
-                    driver: CLAUDE_PROVIDER,
-                    detail: `Stopping Claude task ${stopInput.nativeTaskId} failed.`,
-                    payload: cause,
-                  }),
-              ),
-            );
-          }),
           respondToRuntimeRequest: Effect.fn("ClaudeAdapterV2.respondToRuntimeRequest")(
             function* (requestInput) {
               const pending = (yield* Ref.get(pendingRuntimeRequests)).get(

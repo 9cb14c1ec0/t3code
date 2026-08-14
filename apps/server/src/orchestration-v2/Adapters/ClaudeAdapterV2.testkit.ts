@@ -733,10 +733,6 @@ export function makeReplayQueryRunner(
         interrupt: replayEffect(() => {
           assertNextOutboundFrame({ type: "query.interrupt" });
         }),
-        stopTask: (taskId) =>
-          replayEffect(() => {
-            assertNextOutboundFrame({ type: "task.stop", taskId });
-          }),
         close: Effect.void,
       };
     },

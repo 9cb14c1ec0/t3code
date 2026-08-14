@@ -720,7 +720,6 @@ describe("ClaudeAdapterV2 attachments", () => {
                   }),
                 setModel: () => Effect.void,
                 interrupt: Effect.void,
-                stopTask: () => Effect.void,
                 close: Effect.void,
               }),
             forkSession: () => Effect.die("unused forkSession"),
@@ -843,7 +842,6 @@ describe("ClaudeAdapterV2 attachments", () => {
                   offer: () => Effect.void,
                   setModel: () => Effect.void,
                   interrupt: Effect.void,
-                  stopTask: () => Effect.void,
                   close: Effect.void,
                 };
               }),
@@ -935,7 +933,6 @@ describe("ClaudeAdapterV2 native fork", () => {
                   offer: () => Effect.void,
                   setModel: () => Effect.void,
                   interrupt: Effect.void,
-                  stopTask: () => Effect.void,
                   close: Effect.void,
                 };
               }),
@@ -1105,7 +1102,6 @@ describe("ClaudeAdapterV2 native session identity", () => {
                   offer: () => Effect.void,
                   setModel: () => Effect.void,
                   interrupt: Effect.void,
-                  stopTask: () => Effect.void,
                   close: Effect.void,
                 };
               }),
@@ -1298,7 +1294,6 @@ describe("ClaudeAdapterV2 background wake turns", () => {
   const makeWakeHarnessWithOptions = (options?: {
     readonly close?: (sdkMessages: Queue.Queue<SDKMessage>) => Effect.Effect<void>;
     readonly interrupt?: Effect.Effect<void>;
-    readonly stopTask?: (taskId: string) => Effect.Effect<void>;
   }) =>
     Effect.gen(function* () {
       const fileSystem = yield* FileSystem.FileSystem;
@@ -1333,7 +1328,6 @@ describe("ClaudeAdapterV2 background wake turns", () => {
                 }),
               setModel: () => Effect.void,
               interrupt: options?.interrupt ?? Effect.void,
-              stopTask: options?.stopTask ?? (() => Effect.void),
               close: options?.close?.(sdkMessages) ?? Effect.void,
             }),
           forkSession: () => Effect.die("unused forkSession"),
@@ -1383,36 +1377,6 @@ describe("ClaudeAdapterV2 background wake turns", () => {
       };
     });
   const makeWakeHarness = makeWakeHarnessWithOptions();
-
-  it.effect("treats a stop after query release as already complete", () =>
-    Effect.scoped(
-      Effect.gen(function* () {
-        const stoppedTaskIds = yield* Ref.make<ReadonlyArray<string>>([]);
-        const harness = yield* makeWakeHarnessWithOptions({
-          stopTask: (taskId) => Ref.update(stoppedTaskIds, (current) => [...current, taskId]),
-        });
-        if (harness.runtime.stopTask === undefined) {
-          return yield* Effect.die("Claude adapter runtime must expose stopTask.");
-        }
-        const now = yield* DateTime.now;
-        yield* harness.runtime.startTurn(
-          makeClaudeTestTurnInput({
-            threadId: harness.threadId,
-            providerThread: harness.providerThread,
-            now,
-            attemptId: RunAttemptId.make("attempt-claude-stop-after-release"),
-            text: "Start a query that will be released.",
-            attachments: [],
-          }),
-        );
-        yield* Queue.shutdown(harness.sdkMessages);
-        yield* awaitUntil(() => harness.terminalEvents().length === 1, "released query terminal");
-
-        yield* harness.runtime.stopTask({ nativeTaskId: WAKE_TASK_ID });
-        assert.deepEqual(yield* Ref.get(stoppedTaskIds), []);
-      }).pipe(Effect.provide(Layer.merge(idAllocatorLayer, NodeServices.layer))),
-    ),
-  );
 
   it.effect("projects API retries and resolves the same item after recovery", () =>
     Effect.scoped(
@@ -1726,7 +1690,6 @@ describe("ClaudeAdapterV2 background wake turns", () => {
                 offer: () => Effect.void,
                 setModel: () => Effect.void,
                 interrupt: Effect.void,
-                stopTask: () => Effect.void,
                 // End the message stream so interruptTurn's closed wait resolves
                 // via stream exit finalize (interrupted status clears roster).
                 close: Queue.shutdown(sdkMessages),
@@ -1852,7 +1815,6 @@ describe("ClaudeAdapterV2 background wake turns", () => {
                     offer: () => Effect.void,
                     setModel: () => Effect.void,
                     interrupt: Effect.void,
-                    stopTask: () => Effect.void,
                     close: Queue.shutdown(queue),
                   };
                 }),
@@ -3847,7 +3809,6 @@ describe("ClaudeAdapterV2 background wake turns", () => {
                   offer: () => Effect.void,
                   setModel: () => Effect.void,
                   interrupt: Effect.void,
-                  stopTask: () => Effect.void,
                   // End this process stream so openQuery can replace it.
                   close: Queue.shutdown(sdkMessages),
                 };
@@ -4114,7 +4075,6 @@ describe("ClaudeAdapterV2 background wake turns", () => {
                     offer: () => Effect.void,
                     setModel: () => Effect.void,
                     interrupt: Effect.void,
-                    stopTask: () => Effect.void,
                     close: Queue.shutdown(sdkMessages),
                   };
                 }),
@@ -4347,7 +4307,6 @@ describe("ClaudeAdapterV2 background wake turns", () => {
                     offer: () => Effect.void,
                     setModel: () => Effect.void,
                     interrupt: Effect.void,
-                    stopTask: () => Effect.void,
                     close: Queue.shutdown(sdkMessages),
                   };
                 }),
@@ -4544,7 +4503,6 @@ describe("ClaudeAdapterV2 background wake turns", () => {
                     offer: () => Effect.void,
                     setModel: () => Effect.void,
                     interrupt: Effect.void,
-                    stopTask: () => Effect.void,
                     close: Queue.shutdown(sdkMessages),
                   };
                 });
@@ -4681,7 +4639,6 @@ describe("ClaudeAdapterV2 background wake turns", () => {
                     offer: () => Effect.void,
                     setModel: () => Effect.void,
                     interrupt: Effect.void,
-                    stopTask: () => Effect.void,
                     close: Queue.shutdown(sdkMessages),
                   };
                 });

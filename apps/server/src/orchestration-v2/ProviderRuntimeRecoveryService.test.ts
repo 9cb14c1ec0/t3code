@@ -561,7 +561,6 @@ it.effect(
         "provider-turn.steer",
         "provider-turn.restart",
         "runtime-request.respond",
-        "subagent.stop",
       ]);
       const events = committedInput?.events ?? [];
       assert.deepEqual(
