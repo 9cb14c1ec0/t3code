@@ -14,9 +14,11 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as PubSub from "effect/PubSub";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
+import * as Stream from "effect/Stream";
 
 import * as DesktopBackendPool from "../backend/DesktopBackendPool.ts";
 import * as DesktopConfig from "../app/DesktopConfig.ts";
@@ -150,6 +152,15 @@ export class DesktopUpdates extends Context.Service<
   DesktopUpdates,
   {
     readonly getState: Effect.Effect<DesktopUpdateState>;
+    /** Current state plus a stream of every later state change. */
+    readonly subscribe: Effect.Effect<
+      {
+        readonly latest: DesktopUpdateState;
+        readonly changes: Stream.Stream<DesktopUpdateState>;
+      },
+      never,
+      Scope.Scope
+    >;
     readonly emitState: Effect.Effect<void>;
     readonly disabledReason: Effect.Effect<Option.Option<string>>;
     readonly configure: Effect.Effect<void, DesktopUpdateConfigureError, Scope.Scope>;
@@ -268,12 +279,17 @@ export const make = Effect.gen(function* () {
     ),
   );
 
+  const stateChanges = yield* PubSub.sliding<DesktopUpdateState>(16);
+
   const emitState = Ref.get(updateStateRef).pipe(
     Effect.flatMap((state) => electronWindow.sendAll(IpcChannels.UPDATE_STATE_CHANNEL, state)),
   );
 
   const setState = (state: DesktopUpdateState): Effect.Effect<void> =>
-    Ref.set(updateStateRef, state).pipe(Effect.andThen(emitState));
+    Ref.set(updateStateRef, state).pipe(
+      Effect.andThen(PubSub.publish(stateChanges, state)),
+      Effect.andThen(emitState),
+    );
 
   const updateState = (
     f: (state: DesktopUpdateState) => DesktopUpdateState,
@@ -705,6 +721,11 @@ export const make = Effect.gen(function* () {
 
   return DesktopUpdates.of({
     getState: Ref.get(updateStateRef),
+    subscribe: Effect.gen(function* () {
+      const subscription = yield* PubSub.subscribe(stateChanges);
+      const latest = yield* Ref.get(updateStateRef);
+      return { latest, changes: Stream.fromSubscription(subscription) };
+    }),
     emitState,
     disabledReason: resolveDisabledReason,
     configure: Effect.gen(function* () {
