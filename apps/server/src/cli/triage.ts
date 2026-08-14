@@ -144,7 +144,8 @@ const runInteractiveSession = (input: {
     child.once("error", (cause) =>
       resume(Effect.fail(new TriageAgentSpawnError({ command: input.command, cause }))),
     );
-    child.once("exit", (code) => resume(Effect.succeed(code ?? 0)));
+    // Signal death has no exit code; report failure rather than success.
+    child.once("exit", (code, signal) => resume(Effect.succeed(code ?? (signal === null ? 0 : 1))));
   });
 
 const agentFlag = Flag.choice("agent", ["claude", "codex"]).pipe(
