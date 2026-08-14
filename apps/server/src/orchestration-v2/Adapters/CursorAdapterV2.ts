@@ -25,6 +25,7 @@ import {
   type OrchestrationV2Subagent,
   type OrchestrationV2SubagentActivation,
   type OrchestrationV2TurnItem,
+  orchestrationV2SubagentStatusAsTurnItemStatus,
   type ProviderInstanceId,
   type ThreadId,
 } from "@t3tools/contracts";
@@ -95,6 +96,11 @@ export { cursorSdkModelSelection } from "../../provider/cursorSdkModel.ts";
 export const CURSOR_DRIVER_KIND = CURSOR_PROVIDER;
 export const CURSOR_DEFAULT_INSTANCE_ID = defaultInstanceIdForDriver(CURSOR_DRIVER_KIND);
 const DEFAULT_CURSOR_SETTINGS = Schema.decodeSync(CursorSettings)({});
+
+type CursorTerminalStatus = Extract<
+  OrchestrationV2ProviderTurn["status"],
+  "completed" | "interrupted" | "failed" | "cancelled"
+>;
 
 export const CursorProviderCapabilitiesV2 = {
   sessions: {
@@ -762,6 +768,7 @@ interface ActiveCursorToolCall {
 interface ActiveCursorSubagent {
   task: OrchestrationV2Subagent;
   readonly callId: string;
+  readonly toolCall: Extract<ToolCall, { readonly type: "task" }>;
   readonly childThreadId: ThreadId;
   readonly childRootNodeId: OrchestrationV2ExecutionNode["id"];
   readonly turnItemId: OrchestrationV2TurnItem["id"];
@@ -1440,17 +1447,17 @@ export function makeCursorAdapterV2(
           readonly callId: string;
           readonly toolCall: Extract<ToolCall, { readonly type: "task" }>;
           readonly completed: boolean;
+          readonly terminalStatus?: CursorTerminalStatus;
         }) {
           const args = input.toolCall.args;
           const result =
             input.toolCall.result?.status === "success" ? input.toolCall.result.value : undefined;
           const existing = input.context.subagents.get(input.callId);
           const now = yield* DateTime.now;
-          const status: OrchestrationV2Subagent["status"] = input.completed
-            ? cursorToolFailed(input.toolCall)
-              ? "failed"
-              : "completed"
-            : "running";
+          const completed = input.completed || input.terminalStatus !== undefined;
+          const status: OrchestrationV2Subagent["status"] =
+            input.terminalStatus ??
+            (completed ? (cursorToolFailed(input.toolCall) ? "failed" : "completed") : "running");
           const resultText = [
             ...assistantTextsFromConversationSteps(result?.conversationSteps ?? []),
             ...(result?.resultSuffix === undefined ? [] : [result.resultSuffix]),
@@ -1515,13 +1522,14 @@ export function makeCursorAdapterV2(
             },
             status,
             result: resultText.length === 0 ? (existing?.task.result ?? null) : resultText,
-            currentActivationId: input.completed ? null : activationId,
-            completedAt: input.completed ? now : null,
+            currentActivationId: completed ? null : activationId,
+            completedAt: completed ? now : null,
             updatedAt: now,
           };
           const subagent: ActiveCursorSubagent = {
             task,
             callId: input.callId,
+            toolCall: input.toolCall,
             childThreadId,
             childRootNodeId,
             turnItemId:
@@ -1613,7 +1621,7 @@ export function makeCursorAdapterV2(
               runtimeRequestId: null,
               checkpointScopeId: null,
               startedAt: task.startedAt,
-              completedAt: input.completed ? now : null,
+              completedAt: completed ? now : null,
             },
           });
           yield* emitProviderEvent({
@@ -1634,7 +1642,7 @@ export function makeCursorAdapterV2(
               runtimeRequestId: null,
               checkpointScopeId: null,
               startedAt: task.startedAt,
-              completedAt: input.completed ? now : null,
+              completedAt: completed ? now : null,
             },
           });
           yield* emitProviderEvent({
@@ -1655,7 +1663,7 @@ export function makeCursorAdapterV2(
               status,
               usage: null,
               startedAt: task.startedAt,
-              completedAt: input.completed ? now : null,
+              completedAt: completed ? now : null,
               updatedAt: now,
             } satisfies OrchestrationV2SubagentActivation,
           });
@@ -1672,7 +1680,7 @@ export function makeCursorAdapterV2(
               nativeItemRef: task.nativeTaskRef,
               parentItemId: null,
               ordinal: subagent.turnItemOrdinal,
-              status,
+              status: orchestrationV2SubagentStatusAsTurnItemStatus[status],
               title: task.title,
               startedAt: task.startedAt,
               completedAt: task.completedAt,
@@ -1688,7 +1696,7 @@ export function makeCursorAdapterV2(
             },
           });
 
-          if (input.completed && !subagent.resultProjected) {
+          if (completed && !subagent.resultProjected) {
             for (const [index, nestedTool] of toolCallsFromConversationSteps(
               result?.conversationSteps ?? [],
             ).entries()) {
@@ -1914,6 +1922,19 @@ export function makeCursorAdapterV2(
             yield* emitToolArtifacts({ active: tool, completed: true });
           }
           input.context.tools.clear();
+          for (const subagent of input.context.subagents.values()) {
+            if (subagent.task.currentActivationId === null) {
+              continue;
+            }
+            yield* emitSubagent({
+              context: input.context,
+              callId: subagent.callId,
+              toolCall: subagent.toolCall,
+              completed: true,
+              terminalStatus: input.status,
+            });
+          }
+          input.context.subagents.clear();
           yield* completeReasoning(input.context);
           yield* completeAssistant(input.context);
           yield* emitProviderEvent({

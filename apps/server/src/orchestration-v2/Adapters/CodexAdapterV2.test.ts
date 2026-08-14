@@ -52,6 +52,7 @@ import {
   CODEX_DRIVER_KIND,
   codexBackgroundCommandDetail,
   codexCollabAgentStatus,
+  codexSubagentRebindPatch,
   codexThreadRuntimeParams,
   type CodexAgentMessageDeltaUpdate,
   type CodexAppServerClientFactoryShape,
@@ -72,6 +73,24 @@ describe("CodexAdapterV2 subagent status mapping", () => {
       ),
       ["pending", "running", "idle", "interrupted", "failed", "cancelled", "failed"],
     );
+  });
+
+  it("rebinds a reused subagent when only the provider turn context changes", () => {
+    const runId = RunId.make("run-codex-same-run-rebind");
+    const previousContext = {
+      projectionRunId: runId,
+      itemParentNodeId: NodeId.make("node-codex-previous-turn"),
+    };
+    const nextContext = {
+      projectionRunId: runId,
+      itemParentNodeId: NodeId.make("node-codex-next-turn"),
+    };
+
+    assert.deepEqual(codexSubagentRebindPatch(previousContext, nextContext), {
+      runId,
+      parentNodeId: nextContext.itemParentNodeId,
+    });
+    assert.isNull(codexSubagentRebindPatch(nextContext, nextContext));
   });
 });
 

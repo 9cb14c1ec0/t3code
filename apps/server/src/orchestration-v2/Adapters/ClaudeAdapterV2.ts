@@ -2220,9 +2220,8 @@ export const commitClaudeSubagentRegistryEntry = Effect.fnUntraced(function* <
         registered.task.status === "failed" ||
         registered.task.status === "cancelled");
     if (
-      registeredSettled &&
-      input.activeStart &&
-      !(input.isReopen && registered === input.observed)
+      (!input.activeStart && registered !== input.observed) ||
+      (registeredSettled && input.activeStart && !(input.isReopen && registered === input.observed))
     ) {
       return [false, current] as const;
     }
@@ -4270,7 +4269,12 @@ export function makeClaudeAdapterV2(
                   : context.subagentsByToolUseId.get(message.tool_use_id)) ??
                 (yield* Ref.get(sessionSubagentsByTaskId)).get(message.task_id))
               : undefined;
-            if (workflowParent !== undefined) {
+            if (
+              workflowParent !== undefined &&
+              (workflowParent.task.status === "pending" ||
+                workflowParent.task.status === "running" ||
+                workflowParent.task.status === "waiting")
+            ) {
               for (const entry of workflowEntries) {
                 if (recordField(entry, "type") !== "workflow_agent") continue;
                 const index = nonNegativeInteger(recordField(entry, "index"));

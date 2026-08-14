@@ -883,6 +883,19 @@ interface CodexSubagentThreadContext {
   task: OrchestrationV2Subagent;
 }
 
+export function codexSubagentRebindPatch(
+  currentContext: object,
+  nextContext: Pick<ActiveCodexTurnContext, "projectionRunId" | "itemParentNodeId">,
+): Pick<OrchestrationV2Subagent, "runId" | "parentNodeId"> | null {
+  if (currentContext === nextContext) {
+    return null;
+  }
+  return {
+    runId: nextContext.projectionRunId,
+    parentNodeId: nextContext.itemParentNodeId,
+  };
+}
+
 const isDescendantCodexTurn = (
   candidate: ActiveCodexTurnContext,
   ancestor: ActiveCodexTurnContext,
@@ -2397,12 +2410,12 @@ export function makeCodexAdapterV2(adapterOptions: CodexAdapterV2Options): Provi
           subagent: CodexSubagentThreadContext,
           context: ActiveCodexTurnContext,
         ) => {
-          if (subagent.parentContext.projectionRunId === context.projectionRunId) return;
+          const patch = codexSubagentRebindPatch(subagent.parentContext, context);
+          if (patch === null) return;
           subagent.parentContext = context;
           subagent.task = {
             ...subagent.task,
-            runId: context.projectionRunId,
-            parentNodeId: context.itemParentNodeId,
+            ...patch,
           };
         };
 

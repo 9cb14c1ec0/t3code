@@ -107,6 +107,30 @@ describe("ClaudeAdapterV2 subagent registry", () => {
       assert.strictEqual((yield* Ref.get(registry)).get("task-race"), terminal);
     }),
   );
+
+  it.effect("rejects a stale terminal update after the subagent has resumed", () =>
+    Effect.gen(function* () {
+      type RegistryEntry = {
+        readonly task: { readonly status: "running" | "completed" };
+      };
+      const observed: RegistryEntry = { task: { status: "running" } };
+      const resumed: RegistryEntry = { task: { status: "running" } };
+      const staleTerminal: RegistryEntry = { task: { status: "completed" } };
+      const registry = yield* Ref.make(new Map<string, RegistryEntry>([["task-race", resumed]]));
+
+      const committed = yield* commitClaudeSubagentRegistryEntry({
+        registry,
+        taskId: "task-race",
+        observed,
+        candidate: staleTerminal,
+        activeStart: false,
+        isReopen: false,
+      });
+
+      assert.isFalse(committed);
+      assert.strictEqual((yield* Ref.get(registry)).get("task-race"), resumed);
+    }),
+  );
 });
 
 function makeClaudeTestAppThread(input: {
@@ -3375,6 +3399,16 @@ describe("ClaudeAdapterV2 background wake turns", () => {
             task_id: SUBAGENT_TASK_ID,
             tool_use_id: SUBAGENT_TOOL_USE_ID,
             description: "Stale progress line",
+            workflow_progress: [
+              {
+                type: "workflow_agent",
+                index: 0,
+                label: "Stale worker",
+                state: "active",
+                phaseIndex: 0,
+                attempt: 1,
+              },
+            ],
             uuid: "00000000-0000-4000-8000-000000000409",
             session_id: WAKE_NATIVE_SESSION,
           }),
@@ -3389,6 +3423,11 @@ describe("ClaudeAdapterV2 background wake turns", () => {
         yield* awaitUntil(() => harness.terminalEvents().length === 5, "final turn terminal");
         assert.equal(subagentEvents().at(-1)?.subagent.status, "completed");
         assert.equal(subagentEvents().at(-1)?.subagent.result, SECOND_SUMMARY);
+        assert.lengthOf(
+          new Set(subagentEvents().map((event) => event.subagent.id)),
+          1,
+          "late workflow progress must not create workers under a settled coordinator",
+        );
         assert.isFalse(yield* harness.hasPendingBackgroundWork);
       }).pipe(Effect.provide(Layer.merge(idAllocatorLayer, NodeServices.layer))),
     ),
