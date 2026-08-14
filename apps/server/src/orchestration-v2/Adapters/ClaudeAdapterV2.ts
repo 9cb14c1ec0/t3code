@@ -2201,6 +2201,7 @@ interface ActiveClaudeProviderRetry {
 interface ClaudeSubagentRegistryEntry {
   readonly task: Pick<OrchestrationV2Subagent, "status">;
   readonly activation: { readonly id: string };
+  readonly resumePending?: boolean;
 }
 
 export const commitClaudeSubagentRegistryEntry = Effect.fnUntraced(function* <
@@ -2224,10 +2225,13 @@ export const commitClaudeSubagentRegistryEntry = Effect.fnUntraced(function* <
       registered !== undefined &&
       input.observed !== undefined &&
       registered.activation.id === input.observed.activation.id;
+    // Wake buffering marks a resume before its task_started replay can open
+    // the next activation. The retained activation id belongs to the settled
+    // generation, so no terminal update is valid during that handoff.
     if (
       (!input.activeStart &&
-        registered !== input.observed &&
-        (registeredSettled || !sameObservedActivation)) ||
+        (registered?.resumePending === true ||
+          (registered !== input.observed && (registeredSettled || !sameObservedActivation)))) ||
       (registeredSettled && input.activeStart && !(input.isReopen && registered === input.observed))
     ) {
       return [false, current] as const;

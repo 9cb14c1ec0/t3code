@@ -87,6 +87,7 @@ const CLAUDE_TEST_RUNTIME_POLICY = ProviderAdapterV2RuntimePolicy.make({
 type TestClaudeSubagentRegistryEntry = {
   readonly task: { readonly status: "running" | "waiting" | "completed" };
   readonly activation: { readonly id: string };
+  readonly resumePending?: boolean;
 };
 
 function testRegistryEntry(
@@ -163,6 +164,32 @@ describe("ClaudeAdapterV2 subagent registry", () => {
 
       assert.isTrue(committed);
       assert.strictEqual((yield* Ref.get(registry)).get("task-race"), terminal);
+    }),
+  );
+
+  it.effect("rejects a stale terminal update while a resume is pending activation", () =>
+    Effect.gen(function* () {
+      const observed = testRegistryEntry("running", "activation-1");
+      const resumePending = {
+        ...testRegistryEntry("running", "activation-1"),
+        resumePending: true,
+      };
+      const staleTerminal = testRegistryEntry("completed", "activation-1");
+      const registry = yield* Ref.make(
+        new Map<string, TestClaudeSubagentRegistryEntry>([["task-race", resumePending]]),
+      );
+
+      const committed = yield* commitClaudeSubagentRegistryEntry({
+        registry,
+        taskId: "task-race",
+        observed,
+        candidate: staleTerminal,
+        activeStart: false,
+        isReopen: false,
+      });
+
+      assert.isFalse(committed);
+      assert.strictEqual((yield* Ref.get(registry)).get("task-race"), resumePending);
     }),
   );
 });
