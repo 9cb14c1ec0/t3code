@@ -139,6 +139,13 @@ it.layer(NodeServices.layer)("desktop app update", (it) => {
       expect(result).toEqual({ targetVersion: "1.2.4", method: "desktop-app" });
       // "downloading" is not repeated for every download report.
       expect(stages).toEqual(["downloading", "installing"]);
+
+      // Success releases the in-flight guard: if the desktop rejected the
+      // install after reporting, the server must accept a retry instead of
+      // refusing until restart. (The second run fails differently because
+      // the stub report stream is exhausted.)
+      const retry = yield* service.run(() => Effect.void).pipe(Effect.flip);
+      expect(retry.reason).not.toBe("A desktop app update is already in progress.");
     }),
   );
 

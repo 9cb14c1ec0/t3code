@@ -117,6 +117,11 @@ export const make = Effect.fn("desktopUpdate.desktopAppUpdate.make")(function* (
         yield* Effect.logInfo("Desktop app update installing; the app will relaunch this server.", {
           targetVersion,
         });
+        // If the app really is relaunching, this process stops moments
+        // later and the flag never matters. If the desktop rejected the
+        // install after reporting (app already quitting), clearing it lets
+        // the user retry instead of wedging this server until restart.
+        yield* Ref.set(inFlight, false);
         return { targetVersion, method: "desktop-app" as const };
       }
       if (report.outcome === "up-to-date") {
@@ -157,9 +162,9 @@ export const make = Effect.fn("desktopUpdate.desktopAppUpdate.make")(function* (
         }),
       ).pipe(
         Effect.timeout(DESKTOP_UPDATE_TIMEOUT),
-        Effect.catchTag("TimeoutError", () =>
-          failWith("The desktop app did not finish the update in time."),
-        ),
+        Effect.catchTags({
+          TimeoutError: () => failWith("The desktop app did not finish the update in time."),
+        }),
         Effect.onError(() => Ref.set(inFlight, false)),
       );
     },
