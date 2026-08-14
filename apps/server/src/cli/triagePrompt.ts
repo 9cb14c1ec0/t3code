@@ -121,7 +121,8 @@ of \`main\` for that work, never the tag-pinned diagnosis clone.
 - Note at the end of the issue which model and agent produced it.
 - If \`gh\` is not authenticated, offer \`gh auth login\`, or build a prefilled
   https://github.com/pingdotgg/t3code/issues/new URL with title and body query
-  parameters and open it in their browser.
+  parameters; print the URL, and open it in their browser only after they
+  approve.
 - If the user pasted screenshots, remind them to drag the images into the issue
   after it is created; they cannot be attached from here.
 
@@ -138,7 +139,15 @@ user's environment and evidence instead of filing a new issue. A confirmed
 duplicate with fresh evidence is more useful than a second thread.
 `;
 
-/** The prompt the interactive agent session is launched with. */
+/**
+ * The one-line argument the agent session is launched with. The real
+ * instructions live in `prompt.md` on disk: Windows `.cmd` shims run through
+ * cmd.exe, which cannot carry a multiline, multi-kilobyte argv string.
+ */
+export const buildTriageLaunchPrompt = (promptFilePath: string) =>
+  `Read the file "${promptFilePath}" and follow its instructions exactly: it is your T3 Code triage playbook, and it starts with asking the user what went wrong.`;
+
+/** The full seed prompt, written to `prompt.md` in the triage scratch dir. */
 export const buildTriageSeedPrompt = (contextFilePath: string) => `A T3 Code user is \
 having a problem with their install and started this session with \`t3 triage\`.
 

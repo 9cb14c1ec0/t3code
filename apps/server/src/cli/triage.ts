@@ -16,6 +16,7 @@ import * as NodeReadlinePromises from "node:readline/promises";
 
 import { HostProcessArchitecture, HostProcessPlatform } from "@t3tools/shared/hostProcess";
 import { isCommandAvailable, resolveSpawnCommand } from "@t3tools/shared/shell";
+import * as Config from "effect/Config";
 import * as Console from "effect/Console";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -31,7 +32,11 @@ import { resolveBaseDir } from "../os-jank.ts";
 import { readPersistedServerRuntimeState } from "../serverRuntimeState.ts";
 import { baseDirFlag } from "./config.ts";
 import { resolveCliCommand } from "./invocation.ts";
-import { buildTriageContext, buildTriageSeedPrompt } from "./triagePrompt.ts";
+import {
+  buildTriageContext,
+  buildTriageLaunchPrompt,
+  buildTriageSeedPrompt,
+} from "./triagePrompt.ts";
 
 interface TriageAgent {
   readonly id: "claude" | "codex";
@@ -172,7 +177,11 @@ export const triageCommand = Command.make("triage", {
       const path = yield* Path.Path;
 
       // Triage is a user-facing feature: always the userdata state, never dev.
-      const baseDir = yield* resolveBaseDir(Option.getOrUndefined(flags.baseDir));
+      // --base-dir wins; T3CODE_HOME is its documented env equivalent (same
+      // precedence as `t3 pair`).
+      const explicitBaseDir = Option.getOrUndefined(flags.baseDir);
+      const envHome = yield* Config.string("T3CODE_HOME").pipe(Config.option);
+      const baseDir = yield* resolveBaseDir(explicitBaseDir ?? Option.getOrUndefined(envHome));
       const paths = yield* ServerConfig.deriveServerPaths(baseDir, undefined, {});
 
       const now = yield* DateTime.now;
@@ -237,11 +246,14 @@ export const triageCommand = Command.make("triage", {
         selected = yield* pickAgent(installed);
       }
 
-      const seedPrompt = buildTriageSeedPrompt(contextFilePath);
+      // The full seed prompt always goes to disk. The agent is launched with a
+      // one-line pointer at it: Windows `.cmd` shims run through cmd.exe,
+      // which cannot carry the multiline playbook as an argv string, and with
+      // no agent installed the same file is the paste-anywhere fallback.
+      const promptFilePath = path.join(scratchDir, "prompt.md");
+      yield* fs.writeFileString(promptFilePath, buildTriageSeedPrompt(contextFilePath));
 
       if (selected === undefined) {
-        const promptFilePath = path.join(scratchDir, "prompt.md");
-        yield* fs.writeFileString(promptFilePath, seedPrompt);
         yield* Console.log(
           [
             "No supported agent CLI (claude, codex) was found on this machine.",
@@ -259,7 +271,7 @@ export const triageCommand = Command.make("triage", {
       const model = Option.getOrUndefined(flags.model);
       const spawnSpec = yield* resolveSpawnCommand(selected.command, [
         ...(model === undefined ? [] : ["--model", model]),
-        seedPrompt,
+        buildTriageLaunchPrompt(promptFilePath),
       ]);
       yield* Console.log(`Starting ${selected.label}. It will ask what went wrong.\n`);
       const exitCode = yield* runInteractiveSession({ ...spawnSpec, cwd: scratchDir });

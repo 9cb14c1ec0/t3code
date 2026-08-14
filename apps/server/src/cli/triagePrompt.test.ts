@@ -4,7 +4,12 @@ import * as NodePath from "node:path";
 
 import { assert, it } from "@effect/vitest";
 
-import { buildTriageContext, buildTriageSeedPrompt, TRIAGE_PLAYBOOK } from "./triagePrompt.ts";
+import {
+  buildTriageContext,
+  buildTriageLaunchPrompt,
+  buildTriageSeedPrompt,
+  TRIAGE_PLAYBOOK,
+} from "./triagePrompt.ts";
 
 it("stays byte-identical to .github/triage/PLAYBOOK.md", () => {
   // Old releases fetch the repo copy from `main` and follow it when it differs
@@ -22,6 +27,15 @@ it("seed prompt names the context file and embeds the playbook", () => {
   const prompt = buildTriageSeedPrompt("/tmp/triage-run/context.md");
   assert.include(prompt, "/tmp/triage-run/context.md");
   assert.include(prompt, TRIAGE_PLAYBOOK);
+});
+
+it("launch prompt stays a single argv-safe line naming the prompt file", () => {
+  // The launch argument goes through cmd.exe on Windows (.cmd shims), which
+  // cannot carry newlines; the playbook itself must stay on disk.
+  const launch = buildTriageLaunchPrompt(String.raw`C:\Users\a b\.t3\userdata\triage\x\prompt.md`);
+  assert.notInclude(launch, "\n");
+  assert.include(launch, String.raw`C:\Users\a b\.t3\userdata\triage\x\prompt.md`);
+  assert.isBelow(launch.length, 1_000);
 });
 
 it("context file carries every path the playbook depends on", () => {

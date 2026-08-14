@@ -109,7 +109,8 @@ of `main` for that work, never the tag-pinned diagnosis clone.
 - Note at the end of the issue which model and agent produced it.
 - If `gh` is not authenticated, offer `gh auth login`, or build a prefilled
   https://github.com/pingdotgg/t3code/issues/new URL with title and body query
-  parameters and open it in their browser.
+  parameters; print the URL, and open it in their browser only after they
+  approve.
 - If the user pasted screenshots, remind them to drag the images into the issue
   after it is created; they cannot be attached from here.
 
