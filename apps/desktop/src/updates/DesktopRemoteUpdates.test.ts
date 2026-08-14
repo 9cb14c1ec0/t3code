@@ -136,6 +136,50 @@ describe("DesktopRemoteUpdates", () => {
     );
   });
 
+  it.effect("does not misread a lingering install error as a failed retry", () => {
+    let installAttempts = 0;
+    const harness = makeHarness({
+      quitAndInstall: Effect.suspend(() => {
+        installAttempts += 1;
+        return installAttempts === 1
+          ? Effect.fail(
+              new ElectronUpdater.ElectronUpdaterQuitAndInstallError({
+                channel: "latest",
+                isSilent: true,
+                isForceRunAfter: true,
+                cause: new Error("first attempt failed"),
+              }),
+            )
+          : Effect.void;
+      }),
+    });
+
+    return runRemoteUpdatesTest(harness, ({ reports, requests }) =>
+      Effect.gen(function* () {
+        yield* Queue.offer(requests, request("req-5"));
+        yield* settle;
+        harness.emit("update-available", { version: "1.2.4" });
+        yield* settle;
+        harness.emit("update-downloaded", { version: "1.2.4" });
+        yield* settle;
+        // First run failed; state is "downloaded" with a lingering
+        // errorContext "install". The retry succeeds and must not report
+        // that leftover as a fresh failure.
+        yield* Queue.offer(requests, request("req-6"));
+        yield* settle;
+
+        const retryTerminals = terminalReports(reports).filter(
+          (report) => report.requestId === "req-6",
+        );
+        assert.deepEqual(
+          retryTerminals.map((report) => report.outcome),
+          ["installing"],
+        );
+        assert.equal(harness.quitAndInstalls(), 2);
+      }),
+    );
+  });
+
   it.effect("reports up-to-date without installing when there is no update", () => {
     const harness = makeHarness();
 

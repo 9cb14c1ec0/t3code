@@ -91,18 +91,19 @@ export const listen: Effect.Effect<
                 // published after this point never reaches the requester.
                 yield* publishReport(state, { outcome: "installing" });
                 yield* logInfo("remote update installing", { requestId: request.requestId });
+                const before = yield* updates.getState;
                 const result = yield* updates.install;
                 if (!result.accepted) {
                   yield* publishReport(result.state, {
                     outcome: "failed",
                     reason: "The desktop app could not start the install.",
                   });
-                } else if (
-                  result.state.status === "error" ||
-                  result.state.errorContext === "install"
-                ) {
-                  // Install failures reduce to status "downloaded" with
-                  // errorContext "install", not to "error".
+                } else if (result.state !== before) {
+                  // During an accepted install the only state writes are the
+                  // failure reducers, so a transition means this attempt
+                  // failed. Field checks cannot tell a fresh failure from a
+                  // lingering errorContext left by a previous attempt, which
+                  // success does not clear.
                   yield* publishReport(result.state, {
                     outcome: "failed",
                     reason: result.state.message ?? "The desktop app failed to install the update.",
