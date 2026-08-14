@@ -191,17 +191,22 @@ describe("attachmentStore", () => {
           attachmentsDir,
           "pending-00000000-0000-4000-8000-000000000004.png.part",
         );
+        // Fixed epoch so the test never touches the real clock: files are
+        // stamped relative to `nowMs` below, not to wall time.
+        const nowMs = 1_800_000_000_000;
+        const freshMs = nowMs - 60_000;
+        const staleMs = nowMs - PENDING_ATTACHMENT_MAX_AGE_MS - 60_000;
         for (const filePath of [stalePending, freshPending, scoped, stalePart]) {
           NodeFS.writeFileSync(filePath, Buffer.from("x"));
         }
-        const staleMs = Date.now() - PENDING_ATTACHMENT_MAX_AGE_MS - 60_000;
+        NodeFS.utimesSync(freshPending, freshMs / 1000, freshMs / 1000);
         NodeFS.utimesSync(stalePending, staleMs / 1000, staleMs / 1000);
         NodeFS.utimesSync(scoped, staleMs / 1000, staleMs / 1000);
         NodeFS.utimesSync(stalePart, staleMs / 1000, staleMs / 1000);
 
         const swept = sweepStalePendingAttachments({
           attachmentsDir,
-          nowMs: Date.now(),
+          nowMs,
         });
         expect(swept.deleted).toBe(2);
         expect(NodeFS.existsSync(stalePending)).toBe(false);

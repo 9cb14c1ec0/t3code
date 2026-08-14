@@ -75,17 +75,6 @@ export const AttachmentDeleteInput = Schema.Struct({
 });
 export type AttachmentDeleteInput = typeof AttachmentDeleteInput.Type;
 
-export class AttachmentUploadRequestError extends Schema.TaggedErrorClass<AttachmentUploadRequestError>()(
-  "AttachmentUploadRequestError",
-  {
-    detail: Schema.String,
-  },
-) {
-  override get message(): string {
-    return this.detail;
-  }
-}
-
 export class AttachmentUploadSigningKeyError extends Schema.TaggedErrorClass<AttachmentUploadSigningKeyError>()(
   "AttachmentUploadSigningKeyError",
   {
@@ -96,12 +85,6 @@ export class AttachmentUploadSigningKeyError extends Schema.TaggedErrorClass<Att
     return "Failed to load the attachment upload signing key.";
   }
 }
-
-export const AttachmentUploadError = Schema.Union([
-  AttachmentUploadRequestError,
-  AttachmentUploadSigningKeyError,
-]);
-export type AttachmentUploadError = typeof AttachmentUploadError.Type;
 
 export class AssetWorkspaceContextNotFoundError extends Schema.TaggedErrorClass<AssetWorkspaceContextNotFoundError>()(
   "AssetWorkspaceContextNotFoundError",

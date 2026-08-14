@@ -37,30 +37,51 @@ interface UploadableImage {
   readonly upload: ComposerAttachmentUpload;
 }
 
+/**
+ * True for an uploaded attachment whose bytes live in a different environment
+ * than the composer currently targets. This is a *derived* condition, never
+ * written into the upload state: the ready state (with its attachmentId and
+ * home environment) survives untouched, so pointing the draft back at the
+ * bytes' environment makes the attachment sendable again with no re-upload.
+ */
+export function isAttachmentInWrongEnvironment(
+  image: UploadableImage,
+  environmentId: EnvironmentId,
+): boolean {
+  return image.upload.status === "ready" && image.upload.environmentId !== environmentId;
+}
+
 export interface AttachmentUploadSummary {
+  /** Uploaded into the composer's current environment: sendable. */
   readonly ready: number;
   readonly uploading: number;
   readonly failed: number;
+  /** Uploaded, but into a different environment: blocks send until resolved. */
+  readonly wrongEnvironment: number;
 }
 
 export function summarizeAttachmentUploads(
   images: ReadonlyArray<UploadableImage>,
+  environmentId: EnvironmentId,
 ): AttachmentUploadSummary {
   let ready = 0;
   let uploading = 0;
   let failed = 0;
+  let wrongEnvironment = 0;
   for (const image of images) {
-    if (image.upload.status === "ready") ready += 1;
-    else if (image.upload.status === "uploading") uploading += 1;
+    if (image.upload.status === "ready") {
+      if (image.upload.environmentId === environmentId) ready += 1;
+      else wrongEnvironment += 1;
+    } else if (image.upload.status === "uploading") uploading += 1;
     else failed += 1;
   }
-  return { ready, uploading, failed };
+  return { ready, uploading, failed, wrongEnvironment };
 }
 
 /**
  * Why the send button is disabled, or null when attachments are not blocking.
- * A failed chip has to be retried or removed: silently dropping it would send
- * a message the user believes carries an image.
+ * A failed or unreachable chip has to be retried or removed: silently
+ * dropping it would send a message the user believes carries an image.
  */
 export function attachmentUploadBlockReason(summary: AttachmentUploadSummary): string | null {
   if (summary.uploading > 0) {
@@ -70,6 +91,11 @@ export function attachmentUploadBlockReason(summary: AttachmentUploadSummary): s
     return summary.failed === 1
       ? "Retry or remove the failed image"
       : "Retry or remove the failed images";
+  }
+  if (summary.wrongEnvironment > 0) {
+    return summary.wrongEnvironment === 1
+      ? "Remove the image from another environment"
+      : "Remove the images from another environment";
   }
   return null;
 }
@@ -81,9 +107,10 @@ export function formatAttachmentUploadProgress(progress: number): string {
 }
 
 /**
- * Turn-start references for the images that actually made it to the server.
- * Non-ready images are skipped: the send path is gated on all-ready, so this
- * only drops attachments that were never sendable in the first place.
+ * Turn-start references for the images that actually made it to the server
+ * *in the target environment*. Everything else is skipped: the send path is
+ * gated on all-ready-here, so this only drops attachments that were never
+ * sendable in the first place.
  */
 export function readyAttachmentRefs(
   images: ReadonlyArray<
@@ -93,9 +120,10 @@ export function readyAttachmentRefs(
       readonly sizeBytes: number;
     }
   >,
+  environmentId: EnvironmentId,
 ): ChatAttachment[] {
   return images.flatMap((image) =>
-    image.upload.status === "ready"
+    image.upload.status === "ready" && image.upload.environmentId === environmentId
       ? [
           {
             type: "image" as const,
@@ -112,18 +140,21 @@ export function readyAttachmentRefs(
 /**
  * What to do with an attachment when the composer's target environment
  * changes. The bytes live in exactly one environment, so a ready attachment
- * pointing anywhere else has to be re-uploaded — and can only be re-uploaded
- * while the original `File` is still in memory (it is not, after a reload).
+ * pointing anywhere else has to be re-uploaded — possible only while the
+ * original `File` is still in memory (it is not, after a reload). Without a
+ * File the attachment is left untouched: the mismatch is *derived* for
+ * display and send-gating (`isAttachmentInWrongEnvironment`), and switching
+ * back to the bytes' environment restores it for free.
  */
 export function resolveAttachmentEnvironmentAction(
   image: UploadableImage & { readonly file: File | null },
   targetEnvironmentId: EnvironmentId,
-): "keep" | "reupload" | "unavailable" {
+): "keep" | "reupload" {
   if (image.upload.status !== "ready") {
     return "keep";
   }
   if (image.upload.environmentId === targetEnvironmentId) {
     return "keep";
   }
-  return image.file ? "reupload" : "unavailable";
+  return image.file ? "reupload" : "keep";
 }

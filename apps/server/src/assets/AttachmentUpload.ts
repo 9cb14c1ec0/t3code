@@ -48,8 +48,18 @@ const UploadClaimsSchema = Schema.Struct({
 export type AttachmentUploadClaims = typeof UploadClaimsSchema.Type;
 
 const UploadClaimsJson = Schema.fromJsonString(UploadClaimsSchema);
-const decodeUploadClaims = Schema.decodeUnknownOption(UploadClaimsJson);
+const decodeUploadClaimsOption = Schema.decodeUnknownOption(UploadClaimsJson);
 const encodeUploadClaims = Schema.encodeSync(UploadClaimsJson);
+
+// Plain function (not Effect) so the base64/JSON failure modes stay a simple
+// null, mirroring AssetAccess.decodeClaims.
+function decodeUploadClaims(encodedPayload: string): AttachmentUploadClaims | null {
+  try {
+    return Option.getOrNull(decodeUploadClaimsOption(base64UrlDecodeUtf8(encodedPayload)));
+  } catch {
+    return null;
+  }
+}
 
 const loadSigningSecret = Effect.gen(function* () {
   const secretStore = yield* ServerSecretStore.ServerSecretStore;
@@ -104,12 +114,7 @@ export const validateAttachmentUploadToken = Effect.fn("AttachmentUpload.validat
   if (!secret) return null;
   if (!timingSafeEqualBase64Url(signature, signPayload(encodedPayload, secret))) return null;
 
-  let claims: AttachmentUploadClaims | null;
-  try {
-    claims = Option.getOrNull(decodeUploadClaims(base64UrlDecodeUtf8(encodedPayload)));
-  } catch {
-    claims = null;
-  }
+  const claims = decodeUploadClaims(encodedPayload);
   if (!claims || claims.expiresAt <= (yield* Clock.currentTimeMillis)) return null;
   return claims;
 });

@@ -73,6 +73,7 @@ import {
   ATTACHMENT_WRONG_ENVIRONMENT_REASON,
   attachmentUploadBlockReason,
   formatAttachmentUploadProgress,
+  isAttachmentInWrongEnvironment,
   resolveAttachmentEnvironmentAction,
   summarizeAttachmentUploads,
 } from "../../lib/attachmentUploadState";
@@ -991,8 +992,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   // Derived: composer send state
   // ------------------------------------------------------------------
   const attachmentUploadSummary = useMemo(
-    () => summarizeAttachmentUploads(composerImages),
-    [composerImages],
+    () => summarizeAttachmentUploads(composerImages, environmentId),
+    [composerImages, environmentId],
   );
   const composerSendState = useMemo(
     () =>
@@ -1501,21 +1502,18 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   // ------------------------------------------------------------------
   // The bytes live in exactly one environment. When a draft is pointed at a
   // different one, an attachment we still hold the File for is silently
-  // re-uploaded; one restored after a reload has no File to re-send, so it
-  // fails and has to be removed.
+  // re-uploaded (releasing the old environment's copy first, so nothing
+  // orphans there). One restored after a reload has no File to re-send; its
+  // ready state is left intact and the mismatch is rendered and send-gated
+  // as a derived condition, so switching back recovers it.
   useEffect(() => {
     for (const image of composerImages) {
-      const action = resolveAttachmentEnvironmentAction(image, environmentId);
-      if (action === "reupload") {
-        retryAttachmentUpload({ target: composerDraftTarget, environmentId, image });
-      } else if (action === "unavailable") {
-        setComposerDraftImageUpload(composerDraftTarget, image.id, {
-          status: "failed",
-          reason: ATTACHMENT_WRONG_ENVIRONMENT_REASON,
-        });
+      if (resolveAttachmentEnvironmentAction(image, environmentId) === "reupload") {
+        releaseComposerAttachment(image);
+        startAttachmentUpload({ target: composerDraftTarget, environmentId, image });
       }
     }
-  }, [composerDraftTarget, composerImages, environmentId, setComposerDraftImageUpload]);
+  }, [composerDraftTarget, composerImages, environmentId]);
 
   // ------------------------------------------------------------------
   // Callbacks: prompt change
@@ -2089,11 +2087,12 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
 
     // Attachments are already on the server, so the entry is a handful of id
     // references and the whole stash is one synchronous write. Anything that
-    // has not landed yet cannot be referenced: its upload is cancelled (and
-    // its reservation released) and it comes back as a named drop.
+    // has not landed yet cannot be referenced and comes back as a named drop.
+    // Nothing is cancelled yet: if the write fails below, the composer (and
+    // its in-flight uploads) must be left exactly as they were.
     const stashTarget = composerDraftTarget;
     const attachments: PersistedComposerImageAttachment[] = [];
-    const stillUploadingImageNames: string[] = [];
+    const stillUploadingImages: ComposerImageAttachment[] = [];
     const failedImageNames: string[] = [];
     for (const image of images) {
       if (image.upload.status === "ready") {
@@ -2107,11 +2106,13 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         });
         continue;
       }
-      (image.upload.status === "failed" ? failedImageNames : stillUploadingImageNames).push(
-        image.name,
-      );
-      cancelAttachmentUpload(image.id);
+      if (image.upload.status === "failed") {
+        failedImageNames.push(image.name);
+      } else {
+        stillUploadingImages.push(image);
+      }
     }
+    const stillUploadingImageNames = stillUploadingImages.map((image) => image.name);
 
     const { evicted, written, durable } = stashEntryToQueue({
       id: randomUUID(),
@@ -2147,6 +2148,14 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           "Browser storage is unavailable, so this stash is kept in memory only for this session.",
         data: { hideCopyButton: true },
       });
+    }
+
+    // The write landed, so the composer is being cleared: uploads that could
+    // not be stashed (still in flight) are cancelled now, and failed ones lose
+    // their settled record. Doing this before the write would strand the
+    // chips in `uploading` forever on a rejected write.
+    for (const image of stillUploadingImages) {
+      cancelAttachmentUpload(image.id);
     }
 
     // Only the prompt and images are cleared — terminal/element contexts,
@@ -2890,9 +2899,19 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                 <ComposerPreviewAnnotationCards
                   annotations={composerPreviewAnnotations}
                   images={displayComposerImages}
-                  onRemove={(annotationId) =>
-                    removeComposerDraftPreviewAnnotation(composerDraftTarget, annotationId)
-                  }
+                  onRemove={(annotationId) => {
+                    // The annotation's screenshot is a composer image with a
+                    // server-side upload behind it; removing the card must
+                    // stop that upload / free those bytes like removing a
+                    // chip does.
+                    const annotationImage = displayComposerImages.find(
+                      (image) => image.id === annotationId,
+                    );
+                    if (annotationImage) {
+                      releaseComposerAttachment(annotationImage);
+                    }
+                    removeComposerDraftPreviewAnnotation(composerDraftTarget, annotationId);
+                  }}
                   onExpandImage={(imageId) => {
                     const preview = buildExpandedImagePreview(displayComposerImages, imageId);
                     if (preview) onExpandImage(preview);
@@ -2947,7 +2966,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                         key={image.id}
                         className={cn(
                           "relative h-16 w-16 overflow-hidden rounded-lg border bg-background",
-                          image.upload.status === "failed"
+                          image.upload.status === "failed" ||
+                            isAttachmentInWrongEnvironment(image, environmentId)
                             ? "border-destructive/70"
                             : "border-border/80",
                         )}
@@ -2971,7 +2991,10 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                               alt={image.name}
                               className={cn(
                                 "h-full w-full object-cover",
-                                image.upload.status === "ready" ? "" : "opacity-40",
+                                image.upload.status === "ready" &&
+                                  !isAttachmentInWrongEnvironment(image, environmentId)
+                                  ? ""
+                                  : "opacity-40",
                               )}
                             />
                           </button>
@@ -2989,6 +3012,24 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                           >
                             {formatAttachmentUploadProgress(image.upload.progress)}
                           </span>
+                        )}
+                        {isAttachmentInWrongEnvironment(image, environmentId) && (
+                          <Tooltip>
+                            <TooltipTrigger
+                              render={
+                                <span className="pointer-events-auto absolute inset-x-0 bottom-0 truncate bg-background/85 px-1 py-0.5 text-center text-[10px] text-destructive">
+                                  {ATTACHMENT_WRONG_ENVIRONMENT_REASON}
+                                </span>
+                              }
+                            />
+                            <TooltipPopup
+                              side="top"
+                              className="max-w-64 whitespace-normal leading-tight"
+                            >
+                              This image was uploaded to a different environment. Switch back to
+                              send it from there, or remove it.
+                            </TooltipPopup>
+                          </Tooltip>
                         )}
                         {image.upload.status === "failed" && (
                           <Tooltip>

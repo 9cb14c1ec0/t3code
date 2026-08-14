@@ -258,16 +258,19 @@ export function isOwnedPastedImageUri(uri: string): boolean {
 export async function convertPastedImagesToAttachments(input: {
   readonly uris: ReadonlyArray<string>;
   readonly existingCount: number;
-}): Promise<ReadonlyArray<DraftComposerImageAttachment>> {
+}): Promise<{
+  readonly images: ReadonlyArray<DraftComposerImageAttachment>;
+  /** Set when pasted images were dropped; callers surface it like a pick error. */
+  readonly error: string | null;
+}> {
   const { File } = await import("expo-file-system");
   // Zero slots while attach is disabled: the loop below still runs so owned
   // temporary paste files are deleted, but nothing is decoded or attached.
   const remainingSlots = IMAGE_ATTACH_ENABLED
     ? PROVIDER_SEND_TURN_MAX_ATTACHMENTS - input.existingCount
     : 0;
-  if (!IMAGE_ATTACH_ENABLED && input.uris.length > 0) {
-    console.warn(IMAGE_ATTACH_UNAVAILABLE_MESSAGE, { droppedPastedImages: input.uris.length });
-  }
+  const error =
+    !IMAGE_ATTACH_ENABLED && input.uris.length > 0 ? IMAGE_ATTACH_UNAVAILABLE_MESSAGE : null;
   const results: DraftComposerImageAttachment[] = [];
 
   for (const [index, uri] of input.uris.entries()) {
@@ -308,5 +311,5 @@ export async function convertPastedImagesToAttachments(input: {
     }
   }
 
-  return results;
+  return { images: results, error };
 }

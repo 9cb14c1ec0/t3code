@@ -28,7 +28,8 @@ import { readPreparedConnection } from "../state/session";
 
 interface UploadJob {
   readonly imageId: string;
-  readonly target: ComposerThreadTarget;
+  /** Mutable: a draft move retargets live jobs (`retargetAttachmentUploads`). */
+  target: ComposerThreadTarget;
   readonly environmentId: EnvironmentId;
   readonly file: File;
   readonly name: string;
@@ -44,6 +45,14 @@ interface UploadJob {
 }
 
 const jobsByImageId = new Map<string, UploadJob>();
+/**
+ * Terminal states of finished jobs, kept after the job itself is discarded.
+ * `awaitAttachmentUploads` reads through this so an upload that completed
+ * before the await started is still reported instead of silently dropped.
+ * Entries die on cancel/release; the map is bounded by images attached in a
+ * session.
+ */
+const settledUploadsByImageId = new Map<string, ComposerAttachmentUpload>();
 const queue: UploadJob[] = [];
 let activeCount = 0;
 
@@ -56,6 +65,9 @@ function setUploadState(job: UploadJob, upload: ComposerAttachmentUpload): void 
 function finishJob(job: UploadJob): void {
   if (jobsByImageId.get(job.imageId) === job) {
     jobsByImageId.delete(job.imageId);
+    if (job.finalUpload !== null) {
+      settledUploadsByImageId.set(job.imageId, job.finalUpload);
+    }
   }
   job.resolveSettled(job.finalUpload);
 }
@@ -220,6 +232,7 @@ export function startAttachmentUpload(input: {
  * Used by chip removal and by the retry path before it re-queues.
  */
 export function cancelAttachmentUpload(imageId: string): void {
+  settledUploadsByImageId.delete(imageId);
   const job = jobsByImageId.get(imageId);
   if (!job) return;
   job.cancelled = true;
@@ -246,6 +259,24 @@ export function releaseComposerAttachment(image: ComposerImageAttachment): void 
   }
 }
 
+/**
+ * Points in-flight uploads at a new composer target after
+ * `moveComposerPromptAndImages`. Without this, progress and completion writes
+ * keep landing on the source draft and the moved chip never leaves
+ * `uploading`.
+ */
+export function retargetAttachmentUploads(
+  imageIds: ReadonlyArray<string>,
+  target: ComposerThreadTarget,
+): void {
+  for (const imageId of imageIds) {
+    const job = jobsByImageId.get(imageId);
+    if (job) {
+      job.target = target;
+    }
+  }
+}
+
 /** Re-runs a failed (or environment-stale) upload with the File still in memory. */
 export function retryAttachmentUpload(input: {
   target: ComposerThreadTarget;
@@ -266,12 +297,24 @@ export function retryAttachmentUpload(input: {
 export async function awaitAttachmentUploads(
   imageIds: ReadonlyArray<string>,
 ): Promise<Map<string, ComposerAttachmentUpload>> {
-  const pending = imageIds.flatMap((imageId) => {
+  const results = new Map<string, ComposerAttachmentUpload>();
+  const pending: Array<Promise<readonly [string, ComposerAttachmentUpload | null]>> = [];
+  for (const imageId of imageIds) {
     const job = jobsByImageId.get(imageId);
-    return job ? [job.settled.then((upload) => [imageId, upload] as const)] : [];
-  });
-  const settled = await Promise.all(pending);
-  return new Map(
-    settled.flatMap(([imageId, upload]) => (upload ? [[imageId, upload] as const] : [])),
-  );
+    if (job) {
+      pending.push(job.settled.then((upload) => [imageId, upload] as const));
+      continue;
+    }
+    // The job may have settled (and been discarded) before this await began.
+    const settledUpload = settledUploadsByImageId.get(imageId);
+    if (settledUpload) {
+      results.set(imageId, settledUpload);
+    }
+  }
+  for (const [imageId, upload] of await Promise.all(pending)) {
+    if (upload) {
+      results.set(imageId, upload);
+    }
+  }
+  return results;
 }

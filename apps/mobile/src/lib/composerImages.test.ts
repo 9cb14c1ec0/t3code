@@ -80,12 +80,14 @@ describe("native pasted image cleanup", () => {
     files.set(owned, { base64: "aGVsbG8=", deleted: false });
     files.set(userOwned, { base64: "aGVsbG8=", deleted: false });
 
-    const attachments = await convertPastedImagesToAttachments({
+    const pasted = await convertPastedImagesToAttachments({
       uris: [owned, userOwned],
       existingCount: 0,
     });
 
-    expect(attachments).toEqual([]);
+    expect(pasted.images).toEqual([]);
+    // The drop is surfaced to callers, not just logged.
+    expect(pasted.error).toContain("app update");
     expect(files.get(owned)?.deleted).toBe(true);
     expect(files.get(userOwned)?.deleted).toBe(false);
   });

@@ -3408,24 +3408,18 @@ const composerDraftStore = create<ComposerDraftStoreState>()(
               ...destination,
               prompt: movedPrompt,
               images: [...destination.images, ...source.images],
-              nonPersistedImageIds: [
-                ...destination.nonPersistedImageIds,
-                ...source.nonPersistedImageIds,
-              ],
-              persistedAttachments: [
-                ...destination.persistedAttachments,
-                ...source.persistedAttachments,
-              ],
             };
             // Same clearing shape as clearComposerPromptAndImages, but the
             // preview URLs are NOT revoked: the images moved and their blobs
             // are still referenced from the destination.
+            //
+            // Callers must retarget in-flight uploads to the destination
+            // (`retargetAttachmentUploads`) or progress writes keep aiming at
+            // the source draft and the moved chip never leaves `uploading`.
             const nextSource: ComposerThreadDraftState = {
               ...source,
               prompt: ensureInlineTerminalContextPlaceholders("", source.terminalContexts.length),
               images: [],
-              nonPersistedImageIds: [],
-              persistedAttachments: [],
             };
             const nextDraftsByThreadKey = { ...state.draftsByThreadKey };
             if (shouldRemoveDraft(nextSource)) {

@@ -25,7 +25,6 @@ import {
   AttachmentCreateUploadUrlInput,
   AttachmentCreateUploadUrlResult,
   AttachmentDeleteInput,
-  AttachmentUploadRequestError,
   AttachmentUploadSigningKeyError,
 } from "./assets.ts";
 import {
@@ -671,16 +670,14 @@ export const WsAssetsCreateUrlRpc = Rpc.make(WS_METHODS.assetsCreateUrl, {
 export const WsAttachmentsCreateUploadUrlRpc = Rpc.make(WS_METHODS.attachmentsCreateUploadUrl, {
   payload: AttachmentCreateUploadUrlInput,
   success: AttachmentCreateUploadUrlResult,
-  error: Schema.Union([
-    AttachmentUploadRequestError,
-    AttachmentUploadSigningKeyError,
-    EnvironmentAuthorizationError,
-  ]),
+  error: Schema.Union([AttachmentUploadSigningKeyError, EnvironmentAuthorizationError]),
 });
 
+// Delete is a validated no-op for anything it cannot remove, so the only
+// failure it can surface is authorization.
 export const WsAttachmentsDeleteRpc = Rpc.make(WS_METHODS.attachmentsDelete, {
   payload: AttachmentDeleteInput,
-  error: Schema.Union([AttachmentUploadRequestError, EnvironmentAuthorizationError]),
+  error: EnvironmentAuthorizationError,
 });
 
 export const WsSubscribeVcsStatusRpc = Rpc.make(WS_METHODS.subscribeVcsStatus, {

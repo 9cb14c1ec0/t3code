@@ -121,9 +121,10 @@ export const normalizeDispatchCommand = (command: ClientOrchestrationCommand) =>
 
           const stats = yield* fileSystem.stat(claimPlan.currentPath).pipe(
             Effect.mapError(
-              () =>
+              (cause) =>
                 new OrchestrationDispatchCommandError({
                   message: `Attachment '${attachment.name}' cannot be sent: attachment not found (removed or expired).`,
+                  cause,
                 }),
             ),
           );
@@ -136,9 +137,10 @@ export const normalizeDispatchCommand = (command: ClientOrchestrationCommand) =>
           if (!claimPlan.alreadyScoped) {
             yield* fileSystem.rename(claimPlan.currentPath, claimPlan.finalPath).pipe(
               Effect.mapError(
-                () =>
+                (cause) =>
                   new OrchestrationDispatchCommandError({
                     message: `Failed to claim attachment '${attachment.name}' for this thread.`,
+                    cause,
                   }),
               ),
             );

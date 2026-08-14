@@ -176,6 +176,7 @@ import {
   type ComposerThreadDraftState,
   type DraftSessionState,
 } from "../composerDraftStore";
+import { releaseComposerAttachment } from "../lib/attachmentUploadQueue";
 
 // Settled-tail paging: recent history is the common lookup; the deep tail
 // stays behind an explicit Show more.
@@ -609,6 +610,14 @@ const SidebarDraftBlock = memo(function SidebarDraftBlock(props: {
   ]);
   const handleDiscard = useCallback(
     (draftId: DraftId) => {
+      // Discarding the draft abandons its attachments: stop in-flight
+      // uploads and free the server-side bytes before the store forgets
+      // them. (Server-side, only never-sent `pending-` files can be
+      // deleted, so this can never touch a sent thread's attachments.)
+      const draftImages = useComposerDraftStore.getState().getComposerDraft(draftId)?.images ?? [];
+      for (const image of draftImages) {
+        releaseComposerAttachment(image);
+      }
       // The /draft/$draftId route redirects home on its own when the draft
       // it renders disappears, so discarding the open draft needs no
       // special-casing here.

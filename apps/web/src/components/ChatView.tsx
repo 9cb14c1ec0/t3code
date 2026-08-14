@@ -4964,7 +4964,7 @@ function ChatViewContent(props: ChatViewProps) {
       prompt: promptForSend,
       // Only uploaded attachments count: an image still in flight (or failed)
       // is not sendable content, and the composer blocks the send anyway.
-      imageCount: summarizeAttachmentUploads(composerImages).ready,
+      imageCount: summarizeAttachmentUploads(composerImages, environmentId).ready,
       terminalContexts: composerTerminalContexts,
       elementContextCount:
         composerElementContexts.length +
@@ -5211,19 +5211,12 @@ function ChatViewContent(props: ChatViewProps) {
       const settledUpload = settledUploads.get(image.id);
       return settledUpload ? { ...image, upload: settledUpload } : image;
     });
-    const turnAttachments = readyAttachmentRefs(sendableImages);
+    const turnAttachments = readyAttachmentRefs(sendableImages, environmentId);
     const unsentImageNames = sendableImages
-      .filter((image) => image.upload.status !== "ready")
+      .filter(
+        (image) => image.upload.status !== "ready" || image.upload.environmentId !== environmentId,
+      )
       .map((image) => image.name);
-    if (unsentImageNames.length > 0) {
-      toastManager.add(
-        stackedThreadToast({
-          type: "warning",
-          title: "Some images were not attached",
-          description: `${unsentImageNames.join(", ")} did not finish uploading, so the message was sent without them.`,
-        }),
-      );
-    }
 
     let turnStartSucceeded = false;
     if (failure === null) {
@@ -5281,6 +5274,15 @@ function ChatViewContent(props: ChatViewProps) {
       } else {
         turnStartSucceeded = true;
         acknowledgeActiveThreadWoke();
+        if (unsentImageNames.length > 0) {
+          toastManager.add(
+            stackedThreadToast({
+              type: "warning",
+              title: "Some images were not attached",
+              description: `${unsentImageNames.join(", ")} did not finish uploading, so the message was sent without them.`,
+            }),
+          );
+        }
       }
     }
 
@@ -5304,7 +5306,10 @@ function ChatViewContent(props: ChatViewProps) {
           return next.length === existing.length ? existing : next;
         });
         promptRef.current = promptForSend;
-        const retryComposerImages = composerImagesSnapshot.map(cloneComposerImageForRetry);
+        // `sendableImages` carries the settled upload states; the pre-await
+        // snapshot can still say `uploading` for a job that finished during
+        // the await and would restore chips no live job will ever advance.
+        const retryComposerImages = sendableImages.map(cloneComposerImageForRetry);
         composerImagesRef.current = retryComposerImages;
         composerTerminalContextsRef.current = composerTerminalContextsSnapshot;
         composerElementContextsRef.current = composerElementContextsSnapshot;
