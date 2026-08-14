@@ -109,6 +109,7 @@ import * as UsageService from "./usage/UsageService.ts";
 import * as TraceDiagnostics from "./diagnostics/TraceDiagnostics.ts";
 import * as PullRequestService from "./pullRequest/PullRequestService.ts";
 import * as SourceControlDiscovery from "./sourceControl/SourceControlDiscovery.ts";
+import * as ProjectScaffoldService from "./project/ProjectScaffoldService.ts";
 import * as SourceControlRepositoryService from "./sourceControl/SourceControlRepositoryService.ts";
 import * as AzureDevOpsCli from "./sourceControl/AzureDevOpsCli.ts";
 import * as BitbucketApi from "./sourceControl/BitbucketApi.ts";
@@ -409,6 +410,7 @@ const makeWsRpcLayer = (
       );
       const sourceControlRepositories =
         yield* SourceControlRepositoryService.SourceControlRepositoryService;
+      const projectScaffold = yield* ProjectScaffoldService.ProjectScaffoldService;
       const pullRequests = yield* PullRequestService.PullRequestService;
       const bootstrapCredentials = yield* PairingGrantStore.PairingGrantStore;
       const sessions = yield* SessionStore.SessionStore;
@@ -1820,6 +1822,10 @@ const makeWsRpcLayer = (
             ),
             { "rpc.aggregate": "workspace" },
           ),
+        [WS_METHODS.projectsScaffold]: (input) =>
+          observeRpcEffect(WS_METHODS.projectsScaffold, projectScaffold.scaffold(input), {
+            "rpc.aggregate": "workspace",
+          }),
         [WS_METHODS.shellOpenInEditor]: (input) =>
           observeRpcEffect(WS_METHODS.shellOpenInEditor, externalLauncher.launchEditor(input), {
             "rpc.aggregate": "workspace",

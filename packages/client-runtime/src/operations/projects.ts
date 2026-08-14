@@ -8,11 +8,16 @@ import type {
   SourceControlProviderKind,
   SourceControlRepositoryInfo,
 } from "@t3tools/contracts";
+import {
+  CREATED_PROJECTS_DIRECTORY_NAME,
+  slugifyProjectName,
+} from "@t3tools/shared/projectScaffold";
 import * as Arr from "effect/Array";
 import * as Option from "effect/Option";
 import * as Order from "effect/Order";
 
 import {
+  appendBrowsePathSegment,
   ensureBrowseDirectoryPath,
   findProjectByPath,
   inferProjectTitleFromPath,
@@ -174,6 +179,32 @@ export function buildAddProjectRemoteSourceReadiness(
 export function getAddProjectInitialQuery(baseDirectory: string | null | undefined): string {
   const trimmed = baseDirectory?.trim() ?? "";
   return trimmed.length === 0 ? "~/" : ensureBrowseDirectoryPath(trimmed);
+}
+
+export interface CreateProjectDestination {
+  readonly slug: string;
+  /** Browse-ready parent directory (trailing separator), e.g. "~/t3-projects/". */
+  readonly parentPath: string;
+  /** Full target folder for the new project, e.g. "~/t3-projects/cool-idea". */
+  readonly destinationPath: string;
+}
+
+/**
+ * Maps a typed project name to its create-project target under
+ * `[addProjectBaseDirectory or ~]/t3-projects/[slug]`. Returns null while the
+ * name has no usable slug yet. `baseBrowsePath` comes from
+ * getAddProjectInitialQuery.
+ */
+export function buildCreateProjectDestination(input: {
+  readonly baseBrowsePath: string;
+  readonly name: string;
+}): CreateProjectDestination | null {
+  const slug = slugifyProjectName(input.name);
+  if (slug.length === 0) {
+    return null;
+  }
+  const parentPath = appendBrowsePathSegment(input.baseBrowsePath, CREATED_PROJECTS_DIRECTORY_NAME);
+  return { slug, parentPath, destinationPath: `${parentPath}${slug}` };
 }
 
 export function resolveAddProjectPath(input: {
