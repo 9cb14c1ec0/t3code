@@ -205,7 +205,7 @@ import {
   useComposerDraftStore,
   type DraftId,
 } from "../composerDraftStore";
-import { awaitAttachmentUploads } from "../lib/attachmentUploadQueue";
+import { awaitAttachmentUploads, releaseComposerAttachment } from "../lib/attachmentUploadQueue";
 import { readyAttachmentRefs, summarizeAttachmentUploads } from "../lib/attachmentUploadState";
 import {
   appendTerminalContextsToPrompt,
@@ -4977,6 +4977,12 @@ function ChatViewContent(props: ChatViewProps) {
         planMarkdown: activeProposedPlan.planMarkdown,
       });
       promptRef.current = "";
+      // The follow-up sends text only; any attached images are being
+      // discarded with the rest of the composer, so their uploads and
+      // server-side bytes are released like a chip removal.
+      for (const image of composerImages) {
+        releaseComposerAttachment(image);
+      }
       clearComposerDraftContent(composerDraftTarget);
       composerRef.current?.resetCursorState();
       await onSubmitPlanFollowUp({

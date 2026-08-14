@@ -73,8 +73,11 @@ describe("AttachmentUpload", () => {
       expect(stored).toEqual({ ok: true });
       const finalPath = NodePath.join(config.attachmentsDir, `${issued.attachmentId}.png`);
       expect(NodeFS.existsSync(finalPath)).toBe(true);
-      // No .part residue after a successful store.
-      expect(NodeFS.existsSync(`${finalPath}.part`)).toBe(false);
+      // No .part residue after a successful store (suffix is per-request).
+      const partResidue = NodeFS.readdirSync(config.attachmentsDir).filter((entry) =>
+        entry.endsWith(".part"),
+      );
+      expect(partResidue).toEqual([]);
     }).pipe(Effect.provide(testLayer)),
   );
 

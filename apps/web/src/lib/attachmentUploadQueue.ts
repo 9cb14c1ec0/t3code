@@ -31,6 +31,15 @@ interface UploadJob {
   /** Mutable: a draft move retargets live jobs (`retargetAttachmentUploads`). */
   target: ComposerThreadTarget;
   readonly environmentId: EnvironmentId;
+  /**
+   * A prior copy of the same image in another environment, deleted only once
+   * this upload succeeds. Deleting it up front would leave zero server copies
+   * if the re-upload fails.
+   */
+  readonly supersedes: {
+    readonly environmentId: EnvironmentId;
+    readonly attachmentId: string;
+  } | null;
   readonly file: File;
   readonly name: string;
   readonly mimeType: string;
@@ -87,6 +96,14 @@ interface ByteUpload {
   readonly abort: () => void;
 }
 
+/**
+ * Hard ceiling on one upload attempt. Compressed images are a few MB at most,
+ * so five minutes only ever triggers on a genuinely stalled connection —
+ * without it a stalled POST never settles, the chip stays `uploading`, and
+ * everything gated on settlement (send, pick-and-send) hangs with it.
+ */
+const UPLOAD_TIMEOUT_MS = 5 * 60_000;
+
 function postBytes(
   url: string,
   file: File,
@@ -96,6 +113,7 @@ function postBytes(
   const xhr = new XMLHttpRequest();
   const done = new Promise<"ok" | "aborted">((resolve, reject) => {
     xhr.open("POST", url, true);
+    xhr.timeout = UPLOAD_TIMEOUT_MS;
     xhr.setRequestHeader("Content-Type", mimeType);
     xhr.upload.addEventListener("progress", (event) => {
       if (event.lengthComputable && event.total > 0) {
@@ -162,6 +180,9 @@ async function runJob(job: UploadJob): Promise<void> {
       attachmentId: minted.value.attachmentId,
       environmentId: job.environmentId,
     });
+    if (job.supersedes) {
+      deleteAttachment(job.supersedes.environmentId, job.supersedes.attachmentId);
+    }
   } catch (error) {
     if (job.cancelled) return;
     setUploadState(job, {
@@ -198,6 +219,8 @@ export function startAttachmentUpload(input: {
   target: ComposerThreadTarget;
   environmentId: EnvironmentId;
   image: ComposerImageAttachment;
+  /** See UploadJob.supersedes — set when re-uploading across environments. */
+  supersedes?: { readonly environmentId: EnvironmentId; readonly attachmentId: string };
 }): void {
   const { image } = input;
   if (!image.file || jobsByImageId.has(image.id)) {
@@ -211,6 +234,7 @@ export function startAttachmentUpload(input: {
     imageId: image.id,
     target: input.target,
     environmentId: input.environmentId,
+    supersedes: input.supersedes ?? null,
     file: image.file,
     name: image.name,
     mimeType: image.mimeType,

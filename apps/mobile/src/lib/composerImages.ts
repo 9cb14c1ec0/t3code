@@ -158,10 +158,7 @@ export async function pasteComposerClipboard(input: { readonly existingCount: nu
 
   const remainingSlots = PROVIDER_SEND_TURN_MAX_ATTACHMENTS - input.existingCount;
 
-  if (await clipboard.hasImageAsync()) {
-    if (!IMAGE_ATTACH_ENABLED) {
-      return { images: [], text: null, error: IMAGE_ATTACH_UNAVAILABLE_MESSAGE };
-    }
+  if ((await clipboard.hasImageAsync()) && IMAGE_ATTACH_ENABLED) {
     if (remainingSlots <= 0) {
       return {
         images: [],
@@ -205,13 +202,25 @@ export async function pasteComposerClipboard(input: { readonly existingCount: nu
     };
   }
 
+  // Reached with attach disabled even when the clipboard holds an image:
+  // mixed copy payloads (common on iOS) must still paste their text, with
+  // the image drop surfaced rather than silently swallowed.
   if (await clipboard.hasStringAsync()) {
     const text = await clipboard.getStringAsync();
+    const droppedImage = !IMAGE_ATTACH_ENABLED && (await clipboard.hasImageAsync());
     return {
       images: [],
       text: text.length > 0 ? text : null,
-      error: text.length > 0 ? null : "Clipboard is empty.",
+      error: droppedImage
+        ? IMAGE_ATTACH_UNAVAILABLE_MESSAGE
+        : text.length > 0
+          ? null
+          : "Clipboard is empty.",
     };
+  }
+  if (!IMAGE_ATTACH_ENABLED && (await clipboard.hasImageAsync())) {
+    // Image-only clipboard while attach is disabled.
+    return { images: [], text: null, error: IMAGE_ATTACH_UNAVAILABLE_MESSAGE };
   }
 
   return {

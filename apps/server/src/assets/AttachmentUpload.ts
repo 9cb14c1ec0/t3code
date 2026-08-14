@@ -1,3 +1,6 @@
+// @effect-diagnostics nodeBuiltinImport:off
+import * as NodeCrypto from "node:crypto";
+
 import {
   ATTACHMENT_UPLOAD_URL_TTL_MS,
   type AttachmentCreateUploadUrlInput,
@@ -147,9 +150,12 @@ export const storeAttachmentUpload = Effect.fn("AttachmentUpload.store")(functio
     attachmentsDir: config.attachmentsDir,
     relativePath,
   });
+  // Unique per request: two concurrent POSTs of the same token must not
+  // interleave writes into one temp file. Both rename onto the final path
+  // atomically; last one wins with identical claims-validated content.
   const partPath = resolveAttachmentRelativePath({
     attachmentsDir: config.attachmentsDir,
-    relativePath: `${relativePath}.part`,
+    relativePath: `${relativePath}.${NodeCrypto.randomUUID()}.part`,
   });
   if (!finalPath || !partPath) {
     return { ok: false, status: 500, detail: "Failed to resolve attachment path." };

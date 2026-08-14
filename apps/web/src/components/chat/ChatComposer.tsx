@@ -1502,15 +1502,29 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   // ------------------------------------------------------------------
   // The bytes live in exactly one environment. When a draft is pointed at a
   // different one, an attachment we still hold the File for is silently
-  // re-uploaded (releasing the old environment's copy first, so nothing
-  // orphans there). One restored after a reload has no File to re-send; its
-  // ready state is left intact and the mismatch is rendered and send-gated
-  // as a derived condition, so switching back recovers it.
+  // re-uploaded; the old environment's copy is released only after the new
+  // upload lands (`supersedes`), so a failed re-upload never destroys the
+  // only server copy. One restored after a reload has no File to re-send;
+  // its ready state is left intact and the mismatch is rendered and
+  // send-gated as a derived condition, so switching back recovers it.
   useEffect(() => {
     for (const image of composerImages) {
       if (resolveAttachmentEnvironmentAction(image, environmentId) === "reupload") {
-        releaseComposerAttachment(image);
-        startAttachmentUpload({ target: composerDraftTarget, environmentId, image });
+        const previousUpload = image.upload;
+        cancelAttachmentUpload(image.id);
+        startAttachmentUpload({
+          target: composerDraftTarget,
+          environmentId,
+          image,
+          ...(previousUpload.status === "ready"
+            ? {
+                supersedes: {
+                  environmentId: previousUpload.environmentId,
+                  attachmentId: previousUpload.attachmentId,
+                },
+              }
+            : {}),
+        });
       }
     }
   }, [composerDraftTarget, composerImages, environmentId]);
