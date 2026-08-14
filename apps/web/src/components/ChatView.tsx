@@ -3888,27 +3888,43 @@ function ChatViewContent(props: ChatViewProps) {
     );
   }, []);
 
-  // The anchored reveal effect below owns end-following while the turn is
-  // still streaming, so release only after the turn settles; a size-0 report
-  // often arrives mid-stream, the moment the response outgrows the space.
+  // Release preconditions, re-checked at every quiescent point: the anchored
+  // reveal effect below owns end-following while the turn is still streaming
+  // (a size-0 report often arrives mid-stream, the moment the response
+  // outgrows the space), and an in-flight anchored positioning must finish
+  // before the anchor state is torn down. Returns true when it released.
+  const maybeReleaseCollapsedTimelineAnchor = useCallback(() => {
+    if (!timelineAnchorEndSpaceCollapsedRef.current) {
+      return false;
+    }
+    if (activeTurnInProgressRef.current) {
+      return false;
+    }
+    const positioningInFlight =
+      pendingTimelineAnchorRef.current !== null ||
+      (positionedTimelineAnchorRef.current !== null &&
+        settledTimelineAnchorRef.current !== positionedTimelineAnchorRef.current);
+    if (positioningInFlight) {
+      return false;
+    }
+    releaseCollapsedTimelineAnchor();
+    return true;
+  }, [releaseCollapsedTimelineAnchor]);
+  const maybeReleaseCollapsedTimelineAnchorRef = useRef(maybeReleaseCollapsedTimelineAnchor);
   useEffect(() => {
-    if (activeTurnInProgress) {
-      return;
+    maybeReleaseCollapsedTimelineAnchorRef.current = maybeReleaseCollapsedTimelineAnchor;
+  }, [maybeReleaseCollapsedTimelineAnchor]);
+
+  useEffect(() => {
+    if (!activeTurnInProgress) {
+      maybeReleaseCollapsedTimelineAnchor();
     }
-    if (timelineAnchorEndSpaceCollapsedRef.current) {
-      releaseCollapsedTimelineAnchor();
-    }
-  }, [activeTurnInProgress, releaseCollapsedTimelineAnchor]);
+  }, [activeTurnInProgress, maybeReleaseCollapsedTimelineAnchor]);
 
   const onTimelineAnchorReady = useCallback(
     (messageId: MessageId, anchorIndex: number, endSpaceSize: number) => {
       timelineAnchorEndSpaceCollapsedRef.current = endSpaceSize === 0;
-      if (
-        endSpaceSize === 0 &&
-        settledTimelineAnchorRef.current === messageId &&
-        !activeTurnInProgressRef.current
-      ) {
-        releaseCollapsedTimelineAnchor();
+      if (maybeReleaseCollapsedTimelineAnchor()) {
         return;
       }
       // Anchored-end space can be remeasured when the turn completes. Once the
@@ -3950,12 +3966,14 @@ function ChatViewContent(props: ChatViewProps) {
                 return;
               }
               settledTimelineAnchorRef.current = messageId;
+              // The space may have collapsed while positioning was in flight.
+              maybeReleaseCollapsedTimelineAnchorRef.current();
             });
         });
       };
       requestAnimationFrame(() => positionAnchor(12));
     },
-    [releaseCollapsedTimelineAnchor],
+    [maybeReleaseCollapsedTimelineAnchor],
   );
 
   const onIsAtEndChange = useCallback(
@@ -3978,16 +3996,14 @@ function ChatViewContent(props: ChatViewProps) {
         setShowScrollToBottom(false);
         // Covers anchors whose end space collapsed while the user was away from
         // the end: no further onAnchorReady will fire, so release on return.
-        if (timelineAnchorEndSpaceCollapsedRef.current && !activeTurnInProgressRef.current) {
-          releaseCollapsedTimelineAnchor();
-        }
+        maybeReleaseCollapsedTimelineAnchor();
       } else {
         timelineScrollModeRef.current = "free-scrolling";
         liveFollowUserScrollGenerationRef.current = null;
         showScrollDebouncer.current.maybeExecute();
       }
     },
-    [releaseCollapsedTimelineAnchor],
+    [maybeReleaseCollapsedTimelineAnchor],
   );
 
   // Anchored end space intentionally disables LegendList's normal end-follow so
