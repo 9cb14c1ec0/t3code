@@ -62,10 +62,19 @@ export function nextRemoteDesktopUpdateStep(
     }
     return { action: "download" };
   }
+  // "up-to-date" and "error" are retained from earlier/background checks,
+  // so before this run has issued its own check they are stale, not
+  // terminal: the whole point of a remote request is to look again.
   if (state.status === "up-to-date") {
+    if (attempts.checks === 0) {
+      return { action: "check" };
+    }
     return { action: "done", outcome: "up-to-date" };
   }
   if (state.status === "error") {
+    if (attempts.checks === 0) {
+      return { action: "check" };
+    }
     return {
       action: "done",
       outcome: "failed",

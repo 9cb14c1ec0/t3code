@@ -71,19 +71,21 @@ describe("nextRemoteDesktopUpdateStep", () => {
       { action: "install" },
     );
     // A leftover downloadedVersion on an error state (background updater
-    // error) must fail instead of reporting an install the updater refuses.
-    assert.deepEqual(
-      nextRemoteDesktopUpdateStep(
-        makeState({
-          status: "error",
-          downloadedVersion: "1.2.4",
-          message: "background updater error",
-        }),
-        NO_ATTEMPTS,
-        null,
-      ),
-      { action: "done", outcome: "failed", reason: "background updater error" },
-    );
+    // error) must not report an install the updater refuses: fresh runs
+    // re-check, and post-check it fails.
+    const staleError = makeState({
+      status: "error",
+      downloadedVersion: "1.2.4",
+      message: "background updater error",
+    });
+    assert.deepEqual(nextRemoteDesktopUpdateStep(staleError, NO_ATTEMPTS, null), {
+      action: "check",
+    });
+    assert.deepEqual(nextRemoteDesktopUpdateStep(staleError, { checks: 1, downloads: 0 }, null), {
+      action: "done",
+      outcome: "failed",
+      reason: "background updater error",
+    });
   });
 
   it("rides along while a check or download is already in flight", () => {
@@ -134,10 +136,12 @@ describe("nextRemoteDesktopUpdateStep", () => {
     );
   });
 
-  it("reports up-to-date and error states as terminal", () => {
+  it("re-checks stale up-to-date and error states before trusting them", () => {
+    // These states are retained from earlier/background checks; a remote
+    // request must look again instead of replaying them.
     assert.deepEqual(
       nextRemoteDesktopUpdateStep(makeState({ status: "up-to-date" }), NO_ATTEMPTS, null),
-      { action: "done", outcome: "up-to-date" },
+      { action: "check" },
     );
     assert.deepEqual(
       nextRemoteDesktopUpdateStep(
@@ -145,12 +149,29 @@ describe("nextRemoteDesktopUpdateStep", () => {
         NO_ATTEMPTS,
         null,
       ),
-      { action: "done", outcome: "failed", reason: "feed unreachable" },
+      { action: "check" },
+    );
+  });
+
+  it("reports up-to-date and error states as terminal after this run's check", () => {
+    const checked = { checks: 1, downloads: 0 };
+    assert.deepEqual(
+      nextRemoteDesktopUpdateStep(makeState({ status: "up-to-date" }), checked, null),
+      { action: "done", outcome: "up-to-date" },
     );
     assert.deepEqual(
-      nextRemoteDesktopUpdateStep(makeState({ status: "error" }), NO_ATTEMPTS, null),
-      { action: "done", outcome: "failed", reason: "The desktop app update failed." },
+      nextRemoteDesktopUpdateStep(
+        makeState({ status: "error", message: "feed unreachable" }),
+        checked,
+        null,
+      ),
+      { action: "done", outcome: "failed", reason: "feed unreachable" },
     );
+    assert.deepEqual(nextRemoteDesktopUpdateStep(makeState({ status: "error" }), checked, null), {
+      action: "done",
+      outcome: "failed",
+      reason: "The desktop app update failed.",
+    });
   });
 
   it("checks from idle until the attempt cap, then fails", () => {
