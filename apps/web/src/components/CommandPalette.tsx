@@ -2100,8 +2100,10 @@ function OpenCommandPaletteDialog(props: {
     !createProjectCollision &&
     canCreateProjectInEnvironment(browseEnvironment?.connection.phase) &&
     !isCreatingProject;
+  // A typed name with no usable slug (e.g. all-symbol or non-Latin input)
+  // must not leave the view silently dead; explain why Create is unavailable.
   const createProjectGroups: CommandPaletteView["groups"] =
-    addProjectCreateFlow && createProjectPlan
+    addProjectCreateFlow && trimmedCreateProjectName.length > 0 && createProjectPlan === null
       ? [
           {
             value: "create-project",
@@ -2109,23 +2111,43 @@ function OpenCommandPaletteDialog(props: {
             items: [
               {
                 kind: "action",
-                value: "action:create-project:confirm",
+                value: "action:create-project:invalid-name",
                 searchTerms: [],
-                title: `Create "${trimmedCreateProjectName}"`,
-                description: createProjectCollision
-                  ? `Folder already exists: ${createProjectPlan.destinationPath}`
-                  : createProjectPlan.destinationPath,
+                title: "Name needs a letter or number",
+                description: "The folder name is built from a-z and 0-9 characters in the name",
                 icon: <SquarePlusIcon className={ITEM_ICON_CLASS} />,
-                disabled: !canSubmitCreateProjectFlow,
+                disabled: true,
                 keepOpen: true,
-                run: async () => {
-                  await submitAddProjectCreateFlow();
-                },
+                run: async () => {},
               },
             ],
           },
         ]
-      : [];
+      : addProjectCreateFlow && createProjectPlan
+        ? [
+            {
+              value: "create-project",
+              label: "Create project",
+              items: [
+                {
+                  kind: "action",
+                  value: "action:create-project:confirm",
+                  searchTerms: [],
+                  title: `Create "${trimmedCreateProjectName}"`,
+                  description: createProjectCollision
+                    ? `Folder already exists: ${createProjectPlan.destinationPath}`
+                    : createProjectPlan.destinationPath,
+                  icon: <SquarePlusIcon className={ITEM_ICON_CLASS} />,
+                  disabled: !canSubmitCreateProjectFlow,
+                  keepOpen: true,
+                  run: async () => {
+                    await submitAddProjectCreateFlow();
+                  },
+                },
+              ],
+            },
+          ]
+        : [];
 
   let displayedGroups: CommandPaletteView["groups"] = filteredGroups;
   if (addProjectCreateFlow) {
