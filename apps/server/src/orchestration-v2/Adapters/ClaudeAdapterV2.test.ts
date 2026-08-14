@@ -1298,6 +1298,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
   const makeWakeHarnessWithOptions = (options?: {
     readonly close?: (sdkMessages: Queue.Queue<SDKMessage>) => Effect.Effect<void>;
     readonly interrupt?: Effect.Effect<void>;
+    readonly stopTask?: (taskId: string) => Effect.Effect<void>;
   }) =>
     Effect.gen(function* () {
       const fileSystem = yield* FileSystem.FileSystem;
@@ -1332,7 +1333,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
                 }),
               setModel: () => Effect.void,
               interrupt: options?.interrupt ?? Effect.void,
-              stopTask: () => Effect.void,
+              stopTask: options?.stopTask ?? (() => Effect.void),
               close: options?.close?.(sdkMessages) ?? Effect.void,
             }),
           forkSession: () => Effect.die("unused forkSession"),
@@ -1386,11 +1387,29 @@ describe("ClaudeAdapterV2 background wake turns", () => {
   it.effect("treats a stop after query release as already complete", () =>
     Effect.scoped(
       Effect.gen(function* () {
-        const harness = yield* makeWakeHarness;
+        const stoppedTaskIds = yield* Ref.make<ReadonlyArray<string>>([]);
+        const harness = yield* makeWakeHarnessWithOptions({
+          stopTask: (taskId) => Ref.update(stoppedTaskIds, (current) => [...current, taskId]),
+        });
         if (harness.runtime.stopTask === undefined) {
           return yield* Effect.die("Claude adapter runtime must expose stopTask.");
         }
+        const now = yield* DateTime.now;
+        yield* harness.runtime.startTurn(
+          makeClaudeTestTurnInput({
+            threadId: harness.threadId,
+            providerThread: harness.providerThread,
+            now,
+            attemptId: RunAttemptId.make("attempt-claude-stop-after-release"),
+            text: "Start a query that will be released.",
+            attachments: [],
+          }),
+        );
+        yield* Queue.shutdown(harness.sdkMessages);
+        yield* awaitUntil(() => harness.terminalEvents().length === 1, "released query terminal");
+
         yield* harness.runtime.stopTask({ nativeTaskId: WAKE_TASK_ID });
+        assert.deepEqual(yield* Ref.get(stoppedTaskIds), []);
       }).pipe(Effect.provide(Layer.merge(idAllocatorLayer, NodeServices.layer))),
     ),
   );

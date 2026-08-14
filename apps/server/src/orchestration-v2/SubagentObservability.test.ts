@@ -63,11 +63,14 @@ describe("subagent observability", () => {
 
   it("bounds recent activity and deduplicates adjacent updates", () => {
     const now = DateTime.makeUnsafe("2026-07-26T00:00:00.000Z");
-    const activity = Array.from({ length: 8 }, (_, index) => `step ${index}`).reduce(
+    const first = appendSubagentActivity([], "step 0", now);
+    const deduplicated = appendSubagentActivity(first, "step 0", now);
+    const activity = Array.from({ length: 7 }, (_, index) => `step ${index + 1}`).reduce(
       (current, summary) => appendSubagentActivity(current, summary, now),
-      appendSubagentActivity([], "step 0", now),
+      deduplicated,
     );
 
+    expect(deduplicated).toBe(first);
     expect(activity).toHaveLength(6);
     expect(activity.map((entry) => entry.summary)).toEqual([
       "step 2",

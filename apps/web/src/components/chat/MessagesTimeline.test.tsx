@@ -1219,7 +1219,7 @@ describe("MessagesTimeline", () => {
     expect(markup).not.toContain("Work Log");
   });
 
-  it("keeps completed subagent detail in the Agents panel", async () => {
+  it("omits completed subagent detail from the timeline CTA", async () => {
     const { MessagesTimeline } = await import("./MessagesTimeline");
     const markup = renderToStaticMarkup(
       <MessagesTimeline
