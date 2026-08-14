@@ -2087,10 +2087,12 @@ function OpenCommandPaletteDialog(props: {
         })
       : null,
   );
+  // Exact-name compare: correct on case-sensitive filesystems, and the server's
+  // own exists check backstops case-insensitive ones at submit time.
   const createProjectCollision =
     createProjectPlan !== null &&
     (createProjectParentQuery.data?.entries ?? EMPTY_BROWSE_ENTRIES).some(
-      (entry) => entry.name.toLowerCase() === createProjectPlan.slug,
+      (entry) => entry.name === createProjectPlan.slug,
     );
   const canSubmitCreateProjectFlow =
     addProjectCreateFlow !== null &&

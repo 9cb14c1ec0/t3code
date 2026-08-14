@@ -56,7 +56,7 @@ function mapScaffoldError(operation: string) {
       ? cause
       : new ProjectScaffoldError({
           operation,
-          detail: cause instanceof Error ? cause.message : "The project could not be created.",
+          detail: "The project could not be created.",
           cause,
         }),
   );
@@ -125,15 +125,27 @@ export const make = Effect.gen(function* () {
     input: ProjectScaffoldInput,
   ) {
     const destination = path.resolve(expandHomePath(input.destinationPath.trim(), path));
+    const alreadyExists = new ProjectScaffoldError({
+      operation: "prepareDestination",
+      detail: `A folder already exists at ${destination}.`,
+    });
 
     if (yield* fileSystem.exists(destination).pipe(Effect.orElseSucceed(() => false))) {
-      return yield* new ProjectScaffoldError({
-        operation: "prepareDestination",
-        detail: `A folder already exists at ${destination}.`,
-      });
+      return yield* alreadyExists;
     }
 
-    yield* fileSystem.makeDirectory(destination, { recursive: true });
+    yield* fileSystem.makeDirectory(path.dirname(destination), { recursive: true });
+    // Non-recursive mkdir is the exclusive ownership claim: if a concurrent
+    // scaffold created the folder between the check above and here, this fails
+    // instead of silently adopting (and later deleting) the other call's repo.
+    yield* fileSystem.makeDirectory(destination).pipe(
+      Effect.catch((cause) =>
+        fileSystem.exists(destination).pipe(
+          Effect.orElseSucceed(() => false),
+          Effect.flatMap((nowExists) => Effect.fail(nowExists ? alreadyExists : cause)),
+        ),
+      ),
+    );
 
     // Remove the folder this call created when any later step fails, so a
     // retry with the same name starts clean. Parents created by the recursive
