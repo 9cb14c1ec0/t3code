@@ -57,6 +57,7 @@ import {
   CLAUDE_T3_MCP_TOOL_WILDCARD,
   ClaudeProviderCapabilitiesV2,
   ClaudeAgentSdkQueryRunnerError,
+  claudeSubagentStatusPinsSession,
   claudeEffectiveQueryPolicyKey,
   claudeMcpQueryOverrides,
   claudeQueryMessages,
@@ -83,16 +84,27 @@ const CLAUDE_TEST_RUNTIME_POLICY = ProviderAdapterV2RuntimePolicy.make({
   cwd: "/workspace",
 });
 
+type TestClaudeSubagentRegistryEntry = {
+  readonly task: { readonly status: "running" | "waiting" | "completed" };
+  readonly activation: { readonly id: string };
+};
+
+function testRegistryEntry(
+  status: TestClaudeSubagentRegistryEntry["task"]["status"],
+  activationId: string,
+): TestClaudeSubagentRegistryEntry {
+  return { task: { status }, activation: { id: activationId } };
+}
+
 describe("ClaudeAdapterV2 subagent registry", () => {
   it.effect("rejects an active update that loses the registry race to a terminal update", () =>
     Effect.gen(function* () {
-      type RegistryEntry = {
-        readonly task: { readonly status: "running" | "waiting" | "completed" };
-      };
-      const observed: RegistryEntry = { task: { status: "running" } };
-      const terminal: RegistryEntry = { task: { status: "completed" } };
-      const stale: RegistryEntry = { task: { status: "waiting" } };
-      const registry = yield* Ref.make(new Map<string, RegistryEntry>([["task-race", terminal]]));
+      const observed = testRegistryEntry("running", "activation-1");
+      const terminal = testRegistryEntry("completed", "activation-1");
+      const stale = testRegistryEntry("waiting", "activation-1");
+      const registry = yield* Ref.make(
+        new Map<string, TestClaudeSubagentRegistryEntry>([["task-race", terminal]]),
+      );
 
       const committed = yield* commitClaudeSubagentRegistryEntry({
         registry,
@@ -110,13 +122,12 @@ describe("ClaudeAdapterV2 subagent registry", () => {
 
   it.effect("rejects a stale terminal update after the subagent has resumed", () =>
     Effect.gen(function* () {
-      type RegistryEntry = {
-        readonly task: { readonly status: "running" | "completed" };
-      };
-      const observed: RegistryEntry = { task: { status: "running" } };
-      const resumed: RegistryEntry = { task: { status: "running" } };
-      const staleTerminal: RegistryEntry = { task: { status: "completed" } };
-      const registry = yield* Ref.make(new Map<string, RegistryEntry>([["task-race", resumed]]));
+      const observed = testRegistryEntry("running", "activation-1");
+      const resumed = testRegistryEntry("running", "activation-2");
+      const staleTerminal = testRegistryEntry("completed", "activation-1");
+      const registry = yield* Ref.make(
+        new Map<string, TestClaudeSubagentRegistryEntry>([["task-race", resumed]]),
+      );
 
       const committed = yield* commitClaudeSubagentRegistryEntry({
         registry,
@@ -131,6 +142,51 @@ describe("ClaudeAdapterV2 subagent registry", () => {
       assert.strictEqual((yield* Ref.get(registry)).get("task-race"), resumed);
     }),
   );
+
+  it.effect("accepts a terminal update after same-activation progress wins the race", () =>
+    Effect.gen(function* () {
+      const observed = testRegistryEntry("running", "activation-1");
+      const progressed = testRegistryEntry("running", "activation-1");
+      const terminal = testRegistryEntry("completed", "activation-1");
+      const registry = yield* Ref.make(
+        new Map<string, TestClaudeSubagentRegistryEntry>([["task-race", progressed]]),
+      );
+
+      const committed = yield* commitClaudeSubagentRegistryEntry({
+        registry,
+        taskId: "task-race",
+        observed,
+        candidate: terminal,
+        activeStart: false,
+        isReopen: false,
+      });
+
+      assert.isTrue(committed);
+      assert.strictEqual((yield* Ref.get(registry)).get("task-race"), terminal);
+    }),
+  );
+});
+
+describe("ClaudeAdapterV2 background-work status", () => {
+  it("pins the session for every live subagent status", () => {
+    assert.deepEqual(
+      [
+        "pending",
+        "running",
+        "waiting",
+        "idle",
+        "completed",
+        "failed",
+        "cancelled",
+        "interrupted",
+      ].map((status) =>
+        claudeSubagentStatusPinsSession(
+          status as Parameters<typeof claudeSubagentStatusPinsSession>[0],
+        ),
+      ),
+      [true, true, true, false, false, false, false, false],
+    );
+  });
 });
 
 function makeClaudeTestAppThread(input: {

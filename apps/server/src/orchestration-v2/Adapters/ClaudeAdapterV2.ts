@@ -2200,6 +2200,7 @@ interface ActiveClaudeProviderRetry {
 
 interface ClaudeSubagentRegistryEntry {
   readonly task: Pick<OrchestrationV2Subagent, "status">;
+  readonly activation: { readonly id: string };
 }
 
 export const commitClaudeSubagentRegistryEntry = Effect.fnUntraced(function* <
@@ -2219,8 +2220,14 @@ export const commitClaudeSubagentRegistryEntry = Effect.fnUntraced(function* <
       (registered.task.status === "completed" ||
         registered.task.status === "failed" ||
         registered.task.status === "cancelled");
+    const sameObservedActivation =
+      registered !== undefined &&
+      input.observed !== undefined &&
+      registered.activation.id === input.observed.activation.id;
     if (
-      (!input.activeStart && registered !== input.observed) ||
+      (!input.activeStart &&
+        registered !== input.observed &&
+        (registeredSettled || !sameObservedActivation)) ||
       (registeredSettled && input.activeStart && !(input.isReopen && registered === input.observed))
     ) {
       return [false, current] as const;
@@ -2228,6 +2235,12 @@ export const commitClaudeSubagentRegistryEntry = Effect.fnUntraced(function* <
     return [true, new Map(current).set(input.taskId, input.candidate)] as const;
   });
 });
+
+export function claudeSubagentStatusPinsSession(
+  status: OrchestrationV2Subagent["status"],
+): boolean {
+  return status === "pending" || status === "running" || status === "waiting";
+}
 
 interface ActiveClaudeSubagent {
   task: OrchestrationV2Subagent;
@@ -5146,7 +5159,7 @@ export function makeClaudeAdapterV2(
               }
             }
             for (const subagent of (yield* Ref.get(sessionSubagentsByTaskId)).values()) {
-              if (subagent.task.status === "running") {
+              if (claudeSubagentStatusPinsSession(subagent.task.status)) {
                 return true;
               }
             }
