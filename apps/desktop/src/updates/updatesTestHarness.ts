@@ -26,6 +26,7 @@ export interface UpdatesHarnessOptions {
   >;
   readonly setUpdateChannelError?: DesktopAppSettings.DesktopSettingsWriteError;
   readonly setDisableDifferentialDownload?: Effect.Effect<void>;
+  readonly quitAndInstall?: Effect.Effect<void, ElectronUpdater.ElectronUpdaterQuitAndInstallError>;
   readonly stopBackend?: Effect.Effect<void>;
   readonly env?: Record<string, string | undefined>;
 }
@@ -82,7 +83,7 @@ export function makeHarness(options: UpdatesHarnessOptions = {}) {
     quitAndInstall: () =>
       Effect.sync(() => {
         quitAndInstallCount += 1;
-      }),
+      }).pipe(Effect.andThen(options.quitAndInstall ?? Effect.void)),
     on: (eventName, listener) =>
       Effect.acquireRelease(
         Effect.sync(() => {

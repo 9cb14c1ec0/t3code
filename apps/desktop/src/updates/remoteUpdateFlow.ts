@@ -42,7 +42,11 @@ export function nextRemoteDesktopUpdateStep(
       reason: disabledReason ?? "Automatic updates are disabled on this machine.",
     };
   }
-  if (state.downloadedVersion !== null || state.status === "downloaded") {
+  // Only "downloaded" is installable: installDownloadedUpdate rejects any
+  // other status. A leftover downloadedVersion on an "error" state (e.g. a
+  // background updater error) must fall through to the error branch instead
+  // of reporting an install that the updater will refuse.
+  if (state.status === "downloaded") {
     return { action: "install" };
   }
   if (state.status === "downloading" || state.status === "checking") {

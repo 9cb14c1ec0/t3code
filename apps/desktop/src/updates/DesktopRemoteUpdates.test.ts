@@ -9,6 +9,7 @@ import * as Queue from "effect/Queue";
 import * as Stream from "effect/Stream";
 import * as TestClock from "effect/testing/TestClock";
 
+import * as ElectronUpdater from "../electron/ElectronUpdater.ts";
 import * as DesktopTelemetryPublisher from "../telemetry/DesktopTelemetryPublisher.ts";
 import * as DesktopRemoteUpdates from "./DesktopRemoteUpdates.ts";
 import * as DesktopUpdates from "./DesktopUpdates.ts";
@@ -97,6 +98,40 @@ describe("DesktopRemoteUpdates", () => {
           .map((report) => report.state.status);
         assert.include(statuses, "available");
         assert.include(statuses, "downloaded");
+      }),
+    );
+  });
+
+  it.effect("reports a failed outcome when quitAndInstall fails", () => {
+    const harness = makeHarness({
+      quitAndInstall: Effect.fail(
+        new ElectronUpdater.ElectronUpdaterQuitAndInstallError({
+          channel: "latest",
+          isSilent: true,
+          isForceRunAfter: true,
+          cause: new Error("spawn failed"),
+        }),
+      ),
+    });
+
+    return runRemoteUpdatesTest(harness, ({ reports, requests }) =>
+      Effect.gen(function* () {
+        yield* Queue.offer(requests, request("req-4"));
+        yield* settle;
+        harness.emit("update-available", { version: "1.2.4" });
+        yield* settle;
+        harness.emit("update-downloaded", { version: "1.2.4" });
+        yield* settle;
+
+        // Install failures reduce to status "downloaded" + errorContext
+        // "install"; the run must still end with a failed report after the
+        // premature "installing" one.
+        const terminals = terminalReports(reports);
+        assert.deepEqual(
+          terminals.map((report) => report.outcome),
+          ["installing", "failed"],
+        );
+        assert.equal(terminals[1]?.state.errorContext, "install");
       }),
     );
   });

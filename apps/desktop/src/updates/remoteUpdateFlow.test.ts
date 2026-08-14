@@ -46,7 +46,7 @@ describe("nextRemoteDesktopUpdateStep", () => {
     });
   });
 
-  it("installs as soon as a download is present", () => {
+  it("installs only from the downloaded status the updater will accept", () => {
     assert.deepEqual(
       nextRemoteDesktopUpdateStep(
         makeState({ status: "downloaded", downloadedVersion: "1.2.4" }),
@@ -55,15 +55,34 @@ describe("nextRemoteDesktopUpdateStep", () => {
       ),
       { action: "install" },
     );
-    // A downloadedVersion left over from an earlier local download wins even
-    // when the status has moved on.
+    // A previous install failure keeps status "downloaded", so a remote run
+    // retries the install.
     assert.deepEqual(
       nextRemoteDesktopUpdateStep(
-        makeState({ status: "idle", downloadedVersion: "1.2.4" }),
+        makeState({
+          status: "downloaded",
+          downloadedVersion: "1.2.4",
+          errorContext: "install",
+          message: "quitAndInstall failed",
+        }),
         NO_ATTEMPTS,
         null,
       ),
       { action: "install" },
+    );
+    // A leftover downloadedVersion on an error state (background updater
+    // error) must fail instead of reporting an install the updater refuses.
+    assert.deepEqual(
+      nextRemoteDesktopUpdateStep(
+        makeState({
+          status: "error",
+          downloadedVersion: "1.2.4",
+          message: "background updater error",
+        }),
+        NO_ATTEMPTS,
+        null,
+      ),
+      { action: "done", outcome: "failed", reason: "background updater error" },
     );
   });
 

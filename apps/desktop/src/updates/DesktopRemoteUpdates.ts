@@ -97,7 +97,12 @@ export const listen: Effect.Effect<
                     outcome: "failed",
                     reason: "The desktop app could not start the install.",
                   });
-                } else if (result.state.status === "error") {
+                } else if (
+                  result.state.status === "error" ||
+                  result.state.errorContext === "install"
+                ) {
+                  // Install failures reduce to status "downloaded" with
+                  // errorContext "install", not to "error".
                   yield* publishReport(result.state, {
                     outcome: "failed",
                     reason: result.state.message ?? "The desktop app failed to install the update.",
