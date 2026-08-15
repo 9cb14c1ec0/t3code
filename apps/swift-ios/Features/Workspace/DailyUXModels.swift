@@ -715,6 +715,28 @@ extension FeatureThread {
         }
     }
 
+    var detailHeaderStatusLabel: String? {
+        switch homeStatus {
+        case .done:
+            nil
+        case .ready:
+            "Ready"
+        case .approval, .input, .working, .monitoring, .failed:
+            homeStatusLabel
+        }
+    }
+
+    var detailHeaderStatusIcon: String? {
+        switch homeStatus {
+        case .working:
+            "circle.dotted"
+        case .failed:
+            "exclamationmark.circle"
+        case .done, .approval, .input, .monitoring, .ready:
+            nil
+        }
+    }
+
     func homeRowStatusLabel(at now: Date) -> String {
         switch homeStatus {
         case .done, .ready:

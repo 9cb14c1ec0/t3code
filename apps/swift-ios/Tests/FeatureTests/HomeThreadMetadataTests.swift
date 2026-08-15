@@ -54,6 +54,27 @@ struct HomeThreadMetadataTests {
     }
 
     @Test
+    func completedDetailHeadersDoNotShowAStatusBadge() {
+        let completed = FeatureThread(
+            id: "completed",
+            projectID: "project",
+            title: "Completed task",
+            state: .completed
+        )
+        let working = FeatureThread(
+            id: "working",
+            projectID: "project",
+            title: "Working task",
+            state: .working
+        )
+
+        #expect(completed.detailHeaderStatusLabel == nil)
+        #expect(completed.detailHeaderStatusIcon == nil)
+        #expect(working.detailHeaderStatusLabel == "Working")
+        #expect(working.detailHeaderStatusIcon == "circle.dotted")
+    }
+
+    @Test
     func workingDurationMatchesTheCompactWebFormatAndClampsFutureDates() {
         let thread = FeatureThread(
             id: "working",

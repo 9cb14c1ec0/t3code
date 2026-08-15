@@ -192,23 +192,31 @@ public struct ThreadDetailView: View {
 
     @ViewBuilder
     private func headerStatus(at now: Date) -> some View {
-        HStack(spacing: 5) {
-            if let icon = headerStatusIcon {
-                Image(systemName: icon)
+        let duration = currentThread.homeWorkingDuration(at: now)
+        if let label = duration ?? currentThread.detailHeaderStatusLabel {
+            HStack(spacing: 5) {
+                if let icon = currentThread.detailHeaderStatusIcon {
+                    Image(systemName: icon)
+                }
+                headerStatusText(label, isDuration: duration != nil)
             }
-            if let duration = currentThread.homeWorkingDuration(at: now) {
-                Text(duration)
-                    .monospaced()
-                    .monospacedDigit()
-            } else {
-                Text(currentThread.homeStatusLabel ?? "Ready")
-            }
+            .font(T3Typography.status)
+            .foregroundStyle(headerStatusColor)
+            .lineLimit(1)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(currentThread.homeStatusAccessibilityLabel(at: now))
         }
-        .font(T3Typography.status)
-        .foregroundStyle(headerStatusColor)
-        .lineLimit(1)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(currentThread.homeStatusAccessibilityLabel(at: now))
+    }
+
+    @ViewBuilder
+    private func headerStatusText(_ label: String, isDuration: Bool) -> some View {
+        if isDuration {
+            Text(label)
+                .monospaced()
+                .monospacedDigit()
+        } else {
+            Text(label)
+        }
     }
 
     private var threadActionsMenu: some View {
@@ -281,15 +289,6 @@ public struct ThreadDetailView: View {
             return URL(fileURLWithPath: path).lastPathComponent
         }
         return "workspace"
-    }
-
-    private var headerStatusIcon: String? {
-        switch currentThread.homeStatus {
-        case .working: "circle.dotted"
-        case .done: "checkmark.circle"
-        case .failed: "exclamationmark.circle"
-        case .approval, .input, .monitoring, .ready: nil
-        }
     }
 
     private var headerStatusColor: Color {
