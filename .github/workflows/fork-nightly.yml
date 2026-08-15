@@ -220,6 +220,9 @@ jobs:
             "release/*.blockmap" \
             "release/*.yml"; do
             for file in $pattern; do
+              if [[ "$(basename "$file")" == builder-debug* ]]; then
+                continue
+              fi
               cp "$file" release-publish/
             done
           done
