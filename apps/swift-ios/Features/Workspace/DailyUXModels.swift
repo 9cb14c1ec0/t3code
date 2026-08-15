@@ -112,6 +112,57 @@ enum DailyUXCreationContext {
         )
     }
 
+    static func recentProjects(in snapshot: FeatureSnapshot) -> [DailyUXRecentProject] {
+        let groups = projectGroups(in: snapshot)
+        let availableProjectByID = projects(in: snapshot).reduce(
+            into: [String: FeatureProject]()
+        ) { $0[$1.id] = $1 }
+        let groupByProjectID = groups.reduce(into: [String: DailyUXProjectGroup]()) {
+            result, group in
+            for projectID in group.memberProjectIDs {
+                result[projectID] = group
+            }
+        }
+        var seenGroupIDs = Set<String>()
+
+        return snapshot.threads
+            .sorted(by: recentUseOrder)
+            .compactMap { thread in
+                guard let group = groupByProjectID[thread.projectID],
+                      let sourceProject = availableProjectByID[thread.projectID],
+                      let project = DailyUXProjectGrouping.physicalRepresentative(
+                          for: sourceProject,
+                          in: group
+                      ),
+                      seenGroupIDs.insert(group.id).inserted else {
+                    return nil
+                }
+                return DailyUXRecentProject(group: group, project: project)
+            }
+    }
+
+    static func initialProject(
+        in snapshot: FeatureSnapshot,
+        requestedProjectID: String?
+    ) -> FeatureProject? {
+        let availableProjects = projects(in: snapshot)
+        if let requestedProjectID,
+           let requestedProject = availableProjects.first(where: { $0.id == requestedProjectID }),
+           let group = DailyUXProjectGrouping.group(
+               containing: requestedProjectID,
+               in: projectGroups(in: snapshot)
+           ),
+           let representative = DailyUXProjectGrouping.physicalRepresentative(
+               for: requestedProject,
+               in: group
+           ) {
+            return representative
+        }
+
+        return recentProjects(in: snapshot).first?.project
+            ?? projectGroups(in: snapshot).first?.projects.first
+    }
+
     static func logicalProjectID(
         for project: FeatureProject,
         in snapshot: FeatureSnapshot
@@ -128,6 +179,35 @@ enum DailyUXCreationContext {
                 overrides: snapshot.preferencesByEnvironment?[project.environmentID]?
                     .projectGroupingOverrides ?? [:]
             )
+    }
+
+    private static func recentUseOrder(_ lhs: FeatureThread, _ rhs: FeatureThread) -> Bool {
+        let lhsDate = lhs.lastActivityAt ?? lhs.updatedAt
+        let rhsDate = rhs.lastActivityAt ?? rhs.updatedAt
+        if lhsDate != rhsDate { return lhsDate > rhsDate }
+        return lhs.id < rhs.id
+    }
+
+    static func shouldAdoptAutomaticProject(
+        currentProjectID: String,
+        nextRecentProjectID: String?,
+        isAwaitingRecentActivity: Bool,
+        projectSelectionIsExplicit: Bool,
+        modelSelectionIsExplicit: Bool,
+        workspaceSelectionIsExplicit: Bool,
+        hasDraftContent: Bool,
+        draftRestoreIsComplete: Bool
+    ) -> Bool {
+        guard isAwaitingRecentActivity,
+              let nextRecentProjectID,
+              nextRecentProjectID != currentProjectID else {
+            return false
+        }
+        return !projectSelectionIsExplicit
+            && !modelSelectionIsExplicit
+            && !workspaceSelectionIsExplicit
+            && !hasDraftContent
+            && draftRestoreIsComplete
     }
 
     static func providers(
@@ -185,6 +265,11 @@ enum DailyUXCreationContext {
         return snapshot.preferencesByEnvironment?[environmentID]
             ?? FeatureEnvironmentPreferences()
     }
+}
+
+struct DailyUXRecentProject: Equatable {
+    let group: DailyUXProjectGroup
+    let project: FeatureProject
 }
 
 struct DailyUXProjectGroup: Identifiable, Equatable {
@@ -262,6 +347,17 @@ enum DailyUXProjectGrouping {
     ) -> FeatureProject? {
         groups.first { $0.id == groupID }?
             .preferredProject(environmentID: preferredEnvironmentID)
+    }
+
+    static func physicalRepresentative(
+        for project: FeatureProject,
+        in group: DailyUXProjectGroup
+    ) -> FeatureProject? {
+        let path = normalizedPath(project.path)
+        return group.projects.first {
+            $0.environmentID == project.environmentID
+                && normalizedPath($0.path) == path
+        }
     }
 
     private static func physicalKey(_ project: FeatureProject) -> String {
