@@ -38,6 +38,7 @@ import {
 } from "~/browser/browserRecording";
 import { resolveBrowserRecordingStopTarget } from "~/browser/browserRecordingScope";
 import { useBrowserSurfaceStore } from "~/browser/browserSurfaceStore";
+import { browserDefaultOpenViewport } from "~/browser/browserDefaults";
 import { runBrowserViewportMutation } from "~/browser/browserViewportActions";
 import { previewRuntimeTabId } from "~/browser/previewRuntimeTabId";
 import { isElectron } from "~/env";
@@ -380,6 +381,9 @@ function PreviewAutomationHost(props: { readonly environmentId: EnvironmentId })
                 input: {
                   threadId: request.threadId,
                   ...(resolvedInputUrl ? { url: resolvedInputUrl } : {}),
+                  // An agent that didn't state a size gets the user's
+                  // configured default, same as a hand-opened tab.
+                  viewport: browserDefaultOpenViewport(),
                 },
               });
               if (result._tag === "Failure") {
