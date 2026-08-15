@@ -1,7 +1,11 @@
 # T3 Code
 
 > [!NOTE]
-> This is a fork of [pingdotgg/t3code](https://github.com/pingdotgg/t3code) whose `main` carries one extra feature: **text-to-speech readout of agent replies in the mobile app** — a per-message "Read aloud" button on completed agent messages, plus a Settings → General → "Read Replies Aloud" toggle that speaks new replies as they complete (via `expo-speech`, using the device TTS engine — no Google Play services required). The fork tracks upstream by rebasing that feature onto the latest upstream `main`.
+> This is a fork of [pingdotgg/t3code](https://github.com/pingdotgg/t3code). It tracks upstream by rebasing a small set of changes onto the latest upstream `main`:
+>
+> - **Text-to-speech readout of agent replies in the mobile app** — a per-message "Read aloud" button on completed agent messages, plus a Settings → General → "Read Replies Aloud" toggle that speaks new replies as they complete (via `expo-speech`, using the device TTS engine — no Google Play services required).
+> - **The composer's Build/Plan toggle is visible by default.** Upstream hides plan mode behind Settings → Legacy; this fork flips that default on every surface. The Legacy switch still opts out.
+> - **[Releases](../../releases) include a downloadable Android APK** (arm64) built for sideloading — it runs on de-googled phones (GrapheneOS, CalyxOS, LineageOS, …) with no Google Play integrity check and no Play services dependency. Successive APKs are signed with the same key, so each new release installs as an in-place update; point [Obtainium](https://github.com/ImranR98/Obtainium) at this repo (with prereleases enabled) for automatic updates. Nightly releases also carry unsigned Linux, Windows, and macOS (arm64) desktop builds that self-update from this fork's releases.
 
 T3 Code is an "agent harness control surface". It enables control of the agents on your machine with a best-in-class mobile app ([iOS](https://apps.apple.com/us/app/t3-code-remote-claude-more/id6787819824), [Android](https://play.google.com/store/apps/details?id=com.t3tools.t3code)), [web app](https://app.t3.codes) and [Electron-based desktop app](https://t3.codes).
 
