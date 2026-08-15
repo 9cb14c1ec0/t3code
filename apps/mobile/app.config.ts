@@ -179,10 +179,12 @@ const config: ExpoConfig = {
   orientation: "portrait",
   icon: variant.assets.appIcon,
   userInterfaceStyle: "automatic",
+  // Fork: OTA updates disabled. Upstream's EAS update URL would let upstream's
+  // published JS bundles replace this fork's code at runtime. Fork updates
+  // ship as full APKs via the fork-nightly GitHub release.
   updates: {
-    enabled: true,
-    url: "https://u.expo.dev/d763fcb8-d37c-41ea-a773-b54a0ab4a454",
-    checkAutomatically: "ON_LOAD",
+    enabled: false,
+    checkAutomatically: "NEVER",
     fallbackToCacheTimeout: 0,
   },
   ios: {
