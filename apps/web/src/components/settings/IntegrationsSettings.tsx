@@ -399,10 +399,7 @@ function DesktopOnlyBrowserDefaults({ children }: { readonly children: ReactNode
     <div className="rounded-xl border border-border/60 bg-muted/20 py-1.5">
       <div className="flex items-start gap-2 px-3 py-2 text-[12px] leading-relaxed text-muted-foreground sm:px-4">
         <InfoIcon className="mt-0.5 size-3.5 shrink-0 text-warning" />
-        <p>
-          The in-app browser runs in the desktop app. These defaults apply to it and can only be
-          changed there.
-        </p>
+        <p>Only available in the desktop app.</p>
       </div>
       <div className="opacity-64">{children}</div>
     </div>
