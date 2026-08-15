@@ -32,6 +32,28 @@ struct HomeThreadMetadataTests {
     }
 
     @Test
+    func completedAndIdleRowsUseQuietRelativeAges() {
+        let updatedAt = now.addingTimeInterval(-120)
+        let completed = FeatureThread(
+            id: "completed",
+            projectID: "project",
+            title: "Done task",
+            updatedAt: updatedAt,
+            state: .completed
+        )
+        let idle = FeatureThread(
+            id: "idle",
+            projectID: "project",
+            title: "Idle task",
+            updatedAt: updatedAt,
+            state: .idle
+        )
+
+        #expect(completed.homeRowStatusLabel(at: now) == "2m")
+        #expect(idle.homeRowStatusLabel(at: now) == "2m")
+    }
+
+    @Test
     func workingDurationMatchesTheCompactWebFormatAndClampsFutureDates() {
         let thread = FeatureThread(
             id: "working",

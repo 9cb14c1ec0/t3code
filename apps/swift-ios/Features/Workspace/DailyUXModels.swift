@@ -715,6 +715,15 @@ extension FeatureThread {
         }
     }
 
+    func homeRowStatusLabel(at now: Date) -> String {
+        switch homeStatus {
+        case .done, .ready:
+            SidebarRelativeAge.compact(since: updatedAt, now: now)
+        case .approval, .input, .working, .monitoring, .failed:
+            homeStatusLabel ?? SidebarRelativeAge.compact(since: updatedAt, now: now)
+        }
+    }
+
     func homeWorkingDuration(at now: Date) -> String? {
         guard homeStatus == .working, let workingStartedAt else { return nil }
         return HomeWorkingDuration.compact(since: workingStartedAt, now: now)

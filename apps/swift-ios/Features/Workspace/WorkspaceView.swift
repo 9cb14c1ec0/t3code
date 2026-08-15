@@ -955,14 +955,12 @@ struct FeatureThreadRow: View {
 
     @ViewBuilder
     private func status(at now: Date) -> some View {
-        let label = thread.homeStatusLabel
-            ?? SidebarRelativeAge.compact(since: thread.updatedAt, now: now)
         HStack(spacing: 5) {
             if let icon = statusIcon {
                 Image(systemName: icon)
                     .font(.system(size: 11, weight: .semibold))
             }
-            Text(label)
+            Text(thread.homeRowStatusLabel(at: now))
             if let duration = thread.homeWorkingDuration(at: now) {
                 Text(duration)
                     .font(.system(.footnote, design: .monospaced, weight: .semibold))
@@ -976,9 +974,8 @@ struct FeatureThreadRow: View {
     private var statusIcon: String? {
         switch thread.homeStatus {
         case .working: "circle.dotted"
-        case .done: "checkmark.circle"
         case .failed: "exclamationmark.circle"
-        case .approval, .input, .monitoring, .ready: nil
+        case .approval, .input, .monitoring, .done, .ready: nil
         }
     }
 
@@ -989,8 +986,7 @@ struct FeatureThreadRow: View {
         case .approval: T3Colors.warning
         case .input: T3Colors.statusInput
         case .failed: T3Colors.danger
-        case .done: T3Colors.success
-        case .ready: T3Colors.textTertiary
+        case .done, .ready: T3Colors.textTertiary
         }
     }
 
