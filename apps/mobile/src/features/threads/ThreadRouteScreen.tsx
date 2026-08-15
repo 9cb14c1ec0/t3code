@@ -285,29 +285,35 @@ function ThreadRouteContent(
     routeEnvironmentRuntime?.connectionState ?? (environmentId ? "available" : connectionState);
   const routeConnectionError = routeEnvironmentRuntime?.connectionError ?? null;
   const viewThread = useAtomCommand(threadEnvironment.view, { reportFailure: false });
-  useEffect(() => {
-    const completedAt = selectedThread?.latestTurn?.completedAt;
-    if (
-      selectedThread === null ||
-      completedAt == null ||
-      serverConfig?.environment.capabilities.threadViewState !== true
-    ) {
-      return;
-    }
-    const viewedAtMs = Date.parse(selectedThread.viewedAt ?? "");
-    const completedAtMs = Date.parse(completedAt);
-    if (
-      Number.isFinite(viewedAtMs) &&
-      Number.isFinite(completedAtMs) &&
-      viewedAtMs >= completedAtMs
-    ) {
-      return;
-    }
-    void viewThread({
-      environmentId: selectedThread.environmentId,
-      input: { threadId: selectedThread.id },
-    });
-  }, [selectedThread, serverConfig?.environment.capabilities.threadViewState, viewThread]);
+  const selectedThreadEnvironmentId = selectedThread?.environmentId ?? null;
+  const selectedThreadId = selectedThread?.id ?? null;
+  const selectedThreadCompletedAt = selectedThread?.latestTurn?.completedAt ?? null;
+  const supportsThreadViewState = serverConfig?.environment.capabilities.threadViewState === true;
+  useFocusEffect(
+    useCallback(() => {
+      if (
+        selectedThreadEnvironmentId === null ||
+        selectedThreadId === null ||
+        selectedThreadCompletedAt === null ||
+        !supportsThreadViewState
+      ) {
+        return;
+      }
+      void viewThread({
+        environmentId: selectedThreadEnvironmentId,
+        input: {
+          threadId: selectedThreadId,
+          viewedThrough: selectedThreadCompletedAt,
+        },
+      });
+    }, [
+      selectedThreadCompletedAt,
+      selectedThreadEnvironmentId,
+      selectedThreadId,
+      supportsThreadViewState,
+      viewThread,
+    ]),
+  );
   const selectedThreadWithDraftSettings = useMemo(
     () =>
       selectedThread

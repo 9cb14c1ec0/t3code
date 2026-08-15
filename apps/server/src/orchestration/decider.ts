@@ -563,12 +563,27 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
     }
 
     case "thread.view": {
-      yield* requireThread({
+      const thread = yield* requireThread({
         readModel,
         command,
         threadId: command.threadId,
       });
       const occurredAt = yield* nowIso;
+      const cappedViewedAt = DateTime.make(command.viewedThrough).pipe(
+        Option.filter(
+          (viewedThrough) => DateTime.Order(viewedThrough, DateTime.makeUnsafe(occurredAt)) <= 0,
+        ),
+        Option.as(command.viewedThrough),
+        Option.getOrElse(() => occurredAt),
+      );
+      const viewedAt = DateTime.make(thread.viewedAt ?? thread.createdAt).pipe(
+        Option.filter(
+          (previousViewedAt) =>
+            DateTime.Order(previousViewedAt, DateTime.makeUnsafe(cappedViewedAt)) >= 0,
+        ),
+        Option.as(thread.viewedAt ?? thread.createdAt),
+        Option.getOrElse(() => cappedViewedAt),
+      );
       return {
         ...(yield* withEventBase({
           aggregateKind: "thread",
@@ -579,7 +594,7 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
         type: "thread.viewed",
         payload: {
           threadId: command.threadId,
-          viewedAt: occurredAt,
+          viewedAt,
         },
       };
     }

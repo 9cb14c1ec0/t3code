@@ -92,6 +92,7 @@ import { previewEnvironment } from "../state/preview";
 import {
   legacyProjectCwdPreferenceKey,
   resolveProjectExpanded,
+  resolveThreadViewedAt,
   useUiStateStore,
 } from "../uiStateStore";
 import {
@@ -375,7 +376,12 @@ export const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThr
   const threadRef = scopeThreadRef(thread.environmentId, thread.id);
   const threadKey = scopedThreadKey(threadRef);
   const localLastVisitedAt = useUiStateStore((state) => state.threadLastVisitedAtById[threadKey]);
-  const lastVisitedAt = thread.viewedAt ?? localLastVisitedAt;
+  const pendingViewState = useUiStateStore((state) => state.threadViewStatePendingById[threadKey]);
+  const lastVisitedAt = resolveThreadViewedAt({
+    serverViewedAt: thread.viewedAt,
+    localViewedAt: localLastVisitedAt,
+    pending: pendingViewState,
+  });
   const isSelected = useThreadSelectionStore((state) => state.selectedThreadKeys.has(threadKey));
   const runningTerminalIds = useThreadRunningTerminalIds({
     environmentId: thread.environmentId,
@@ -1211,14 +1217,16 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
   );
   const threadLastVisitedAts = useUiStateStore(
     useShallow((state) =>
-      projectThreads.map(
-        (thread) =>
-          thread.viewedAt ??
-          state.threadLastVisitedAtById[
-            scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id))
-          ] ??
-          null,
-      ),
+      projectThreads.map((thread) => {
+        const threadKey = scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id));
+        return (
+          resolveThreadViewedAt({
+            serverViewedAt: thread.viewedAt,
+            localViewedAt: state.threadLastVisitedAtById[threadKey],
+            pending: state.threadViewStatePendingById[threadKey],
+          }) ?? null
+        );
+      }),
     ),
   );
   const [renamingThreadKey, setRenamingThreadKey] = useState<string | null>(null);

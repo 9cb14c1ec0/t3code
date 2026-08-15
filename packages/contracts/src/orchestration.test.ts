@@ -391,6 +391,7 @@ it.effect("decodes thread view-state commands", () =>
       type: "thread.view",
       commandId: "cmd-view-1",
       threadId: "thread-1",
+      viewedThrough: "2026-01-01T00:00:00.000Z",
     });
     const markUnread = yield* decodeOrchestrationCommand({
       type: "thread.mark-unread",

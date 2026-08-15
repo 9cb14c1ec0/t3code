@@ -9,10 +9,12 @@ import {
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
+import * as TestClock from "effect/testing/TestClock";
 
 import { decideOrchestrationCommand } from "./decider.ts";
 
 const COMPLETED_AT = "2026-01-01T00:01:00.000Z";
+const VIEWED_THROUGH = "2026-01-01T00:00:45.000Z";
 
 function makeReadModel(): OrchestrationReadModel {
   return {
@@ -55,13 +57,15 @@ function makeReadModel(): OrchestrationReadModel {
 }
 
 it.layer(NodeServices.layer)("thread view-state decider", (it) => {
-  it.effect("stamps a view with server time", () =>
+  it.effect("stamps a view at the acknowledged boundary", () =>
     Effect.gen(function* () {
+      yield* TestClock.setTime(Date.parse("2026-01-02T00:00:00.000Z"));
       const event = yield* decideOrchestrationCommand({
         command: {
           type: "thread.view",
           commandId: CommandId.make("cmd-view"),
           threadId: ThreadId.make("thread-1"),
+          viewedThrough: VIEWED_THROUGH,
         },
         readModel: makeReadModel(),
       });
@@ -69,7 +73,7 @@ it.layer(NodeServices.layer)("thread view-state decider", (it) => {
 
       expect(viewed?.type).toBe("thread.viewed");
       if (viewed?.type === "thread.viewed") {
-        expect(viewed.payload.viewedAt).toBe(viewed.occurredAt);
+        expect(viewed.payload.viewedAt).toBe(VIEWED_THROUGH);
       }
     }),
   );
