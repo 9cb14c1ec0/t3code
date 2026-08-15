@@ -20,8 +20,10 @@ import {
   type PreviewViewportSetting,
 } from "@t3tools/contracts";
 import { PREVIEW_VIEWPORT_PRESETS } from "@t3tools/shared/previewViewport";
+import { InfoIcon } from "lucide-react";
 
 import { ScreenRotationIcon } from "~/browser/ScreenRotationIcon";
+import { isElectron } from "../../env";
 
 import { Button } from "../ui/button";
 import { NumberField, NumberFieldGroup, NumberFieldInput } from "../ui/number-field";
@@ -108,7 +110,7 @@ const rotateViewport = (
   height: viewport.width,
 });
 
-function BrowserViewportSetting() {
+function BrowserViewportSetting({ disabled }: { readonly disabled: boolean }) {
   const viewport = useClientSettings((settings) => settings.browserDefaultViewport);
   const updateSettings = useUpdatePrimarySettings();
 
@@ -162,7 +164,7 @@ function BrowserViewportSetting() {
       {...searchableSetting("browser-default-viewport")}
       description="The viewport a browser tab opens at, for both you and agents. Fill sizes the page to the panel; any other choice opens the device toolbar at that size."
       resetAction={
-        viewport._tag !== DEFAULT_BROWSER_VIEWPORT._tag ? (
+        !disabled && viewport._tag !== DEFAULT_BROWSER_VIEWPORT._tag ? (
           <SettingResetButton
             label="default browser viewport"
             onClick={() => updateSettings({ browserDefaultViewport: DEFAULT_BROWSER_VIEWPORT })}
@@ -171,7 +173,11 @@ function BrowserViewportSetting() {
       }
       control={
         <div className="flex w-full items-center gap-2 sm:w-auto">
-          <Select value={viewportSelectValue(viewport)} onValueChange={selectViewport}>
+          <Select
+            value={viewportSelectValue(viewport)}
+            onValueChange={selectViewport}
+            disabled={disabled}
+          >
             <SelectTrigger className="w-full sm:w-44" aria-label="Default browser viewport">
               <SelectValue>{viewportSelectLabel(viewport)}</SelectValue>
             </SelectTrigger>
@@ -200,6 +206,7 @@ function BrowserViewportSetting() {
                 value={presentedSize.width}
                 min={PREVIEW_VIEWPORT_MIN_DIMENSION}
                 max={PREVIEW_VIEWPORT_MAX_DIMENSION}
+                disabled={disabled}
                 // Pixel counts read as raw numbers; grouping would show "1,024".
                 format={NO_GROUPING}
                 size="sm"
@@ -215,6 +222,7 @@ function BrowserViewportSetting() {
                 value={presentedSize.height}
                 min={PREVIEW_VIEWPORT_MIN_DIMENSION}
                 max={PREVIEW_VIEWPORT_MAX_DIMENSION}
+                disabled={disabled}
                 format={NO_GROUPING}
                 size="sm"
                 className="w-24"
@@ -230,6 +238,7 @@ function BrowserViewportSetting() {
                     <Button
                       size="icon-sm"
                       variant="ghost-muted"
+                      disabled={disabled}
                       aria-label={`Rotate to ${
                         presentedSize.height >= presentedSize.width ? "landscape" : "portrait"
                       }`}
@@ -251,7 +260,7 @@ function BrowserViewportSetting() {
   );
 }
 
-function BrowserZoomSetting() {
+function BrowserZoomSetting({ disabled }: { readonly disabled: boolean }) {
   const zoomFactor = useClientSettings((settings) => settings.browserDefaultZoomFactor);
   const updateSettings = useUpdatePrimarySettings();
 
@@ -260,7 +269,7 @@ function BrowserZoomSetting() {
       {...searchableSetting("browser-default-zoom")}
       description="Page zoom applied to new browser tabs."
       resetAction={
-        zoomFactor !== DEFAULT_PREVIEW_ZOOM_FACTOR ? (
+        !disabled && zoomFactor !== DEFAULT_PREVIEW_ZOOM_FACTOR ? (
           <SettingResetButton
             label="default browser zoom"
             onClick={() =>
@@ -271,6 +280,7 @@ function BrowserZoomSetting() {
       }
       control={
         <Select
+          disabled={disabled}
           value={String(zoomFactor)}
           onValueChange={(value) => {
             const next = PREVIEW_ZOOM_LEVELS.find((level) => String(level) === value);
@@ -293,7 +303,7 @@ function BrowserZoomSetting() {
   );
 }
 
-function BrowserAppearanceSetting() {
+function BrowserAppearanceSetting({ disabled }: { readonly disabled: boolean }) {
   const appearance = useClientSettings((settings) => settings.browserDefaultAppearance);
   const updateSettings = useUpdatePrimarySettings();
 
@@ -302,7 +312,7 @@ function BrowserAppearanceSetting() {
       {...searchableSetting("browser-default-appearance")}
       description="The color scheme pages are told to prefer. System follows your OS setting."
       resetAction={
-        appearance !== DEFAULT_PREVIEW_APPEARANCE ? (
+        !disabled && appearance !== DEFAULT_PREVIEW_APPEARANCE ? (
           <SettingResetButton
             label="default browser appearance"
             onClick={() => updateSettings({ browserDefaultAppearance: DEFAULT_PREVIEW_APPEARANCE })}
@@ -311,6 +321,7 @@ function BrowserAppearanceSetting() {
       }
       control={
         <Select
+          disabled={disabled}
           value={appearance}
           onValueChange={(value) => {
             if (value === "system" || value === "light" || value === "dark") {
@@ -334,7 +345,7 @@ function BrowserAppearanceSetting() {
   );
 }
 
-function BrowserAutoShowFloatingPreviewSetting() {
+function BrowserAutoShowFloatingPreviewSetting({ disabled }: { readonly disabled: boolean }) {
   const autoShow = useClientSettings((settings) => settings.browserAutoShowFloatingPreview);
   const updateSettings = useUpdatePrimarySettings();
 
@@ -343,7 +354,7 @@ function BrowserAutoShowFloatingPreviewSetting() {
       {...searchableSetting("browser-auto-show-floating-preview")}
       description="Pop the floating preview into view when an agent opens a browser. An agent that explicitly asks to show or hide its preview still gets what it asked for."
       resetAction={
-        autoShow !== DEFAULT_BROWSER_AUTO_SHOW_FLOATING_PREVIEW ? (
+        !disabled && autoShow !== DEFAULT_BROWSER_AUTO_SHOW_FLOATING_PREVIEW ? (
           <SettingResetButton
             label="auto-show floating preview"
             onClick={() =>
@@ -356,6 +367,7 @@ function BrowserAutoShowFloatingPreviewSetting() {
       }
       control={
         <Switch
+          disabled={disabled}
           checked={autoShow}
           onCheckedChange={(checked) =>
             updateSettings({ browserAutoShowFloatingPreview: Boolean(checked) })
@@ -367,14 +379,37 @@ function BrowserAutoShowFloatingPreviewSetting() {
   );
 }
 
+/**
+ * The preview browser is a Chromium guest the desktop app hosts, so these
+ * defaults only mean anything there. They are also *client-local*, which is the
+ * reason for disabling rather than hiding: editing them from a browser tab
+ * would silently write preferences that belong to a different client, reading
+ * as though the desktop app had been configured when it hadn't.
+ */
+function DesktopOnlyBrowserNotice() {
+  return (
+    <div className="flex items-start gap-2 rounded-xl px-3 py-2.5 text-[12px] leading-relaxed text-muted-foreground sm:px-4">
+      <InfoIcon className="mt-0.5 size-3.5 shrink-0 text-warning" />
+      <p>
+        The in-app browser runs in the desktop app. These defaults apply to it and can only be
+        changed there.
+      </p>
+    </div>
+  );
+}
+
 export function IntegrationsSettingsPanel() {
+  // Client-local preview defaults are editable only where the preview exists.
+  const previewDefaultsDisabled = !isElectron;
+
   return (
     <SettingsPageContainer>
       <SettingsSection id="browser" title="Browser">
-        <BrowserViewportSetting />
-        <BrowserZoomSetting />
-        <BrowserAppearanceSetting />
-        <BrowserAutoShowFloatingPreviewSetting />
+        {previewDefaultsDisabled ? <DesktopOnlyBrowserNotice /> : null}
+        <BrowserViewportSetting disabled={previewDefaultsDisabled} />
+        <BrowserZoomSetting disabled={previewDefaultsDisabled} />
+        <BrowserAppearanceSetting disabled={previewDefaultsDisabled} />
+        <BrowserAutoShowFloatingPreviewSetting disabled={previewDefaultsDisabled} />
       </SettingsSection>
     </SettingsPageContainer>
   );
