@@ -209,7 +209,9 @@ export const ClientSettingsSchema = Schema.Struct({
   // Legacy plan mode. The composer's Build/Plan toggle was removed from the
   // default UI; this beta flag restores it (plus the /plan and /default slash
   // commands) for users who still rely on the old workflow.
-  planModeEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
+  // Fork: default flipped to true — the Build/Plan toggle stays visible unless
+  // explicitly disabled in Settings → Legacy.
+  planModeEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
   // Legacy sidebar (the original per-project tree). Deliberately a fresh key
   // (was `sidebarV2Enabled` + `sidebarV2ConfiguredByUser`): decoding drops the
   // old keys, so everyone, including prior beta opt-outs, resets to the new
