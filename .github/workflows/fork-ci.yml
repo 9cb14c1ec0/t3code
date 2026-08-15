@@ -1,0 +1,67 @@
+# Fork-specific CI on standard GitHub runners. Upstream's ci.yml targets
+# org-specific blacksmith runners that do not exist here, so it is disabled on
+# the fork and this workflow provides the safety net after rebases.
+name: Fork CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Check, typecheck, test
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: |
+            /*
+            !/.repos/
+          sparse-checkout-cone-mode: false
+
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version-file: package.json
+          cache: true
+          run-install: true
+
+      - name: Check
+        run: vp check
+
+      - name: Typecheck
+        run: vp run typecheck
+
+      - name: Install browser secret helper build libraries
+        run: sudo apt-get update && sudo apt-get install -y libsecret-1-dev pkg-config
+
+      # Desktop and web tests both touch Electron. Installing it once here
+      # avoids a parallel download race that leaves a broken runtime.
+      - name: Ensure Electron runtime is installed
+        run: vp run --filter @t3tools/desktop ensure:electron
+
+      # Upstream gives web its own 8-vCPU runner. On this 4-vCPU runner the
+      # MessagesTimeline import exceeds its hook budget when every package
+      # transforms at once, so web and the server suite each get the machine.
+      - name: Test
+        run: vp run --parallel --concurrency-limit 2 --filter '!t3' --filter '!@t3tools/monorepo' --filter '!@t3tools/web' test
+
+      - name: Test web
+        run: vp run --filter @t3tools/web test
+
+      # ServerBrowserPage.test.ts launches Playwright's headless shell.
+      # Upstream ci.yml installs it on the server job; this runner does not
+      # have the browser cached.
+      - name: Install Chromium for server browser integration tests
+        run: node apps/server/node_modules/playwright-core/cli.js install --with-deps --only-shell chromium
+
+      - name: Test server
+        run: vp run --filter t3 test
