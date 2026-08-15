@@ -280,9 +280,34 @@ function ThreadRouteContent(
     }, [props.renderInspector]),
   );
   const routeEnvironmentRuntime = useRemoteEnvironmentRuntime(environmentId);
+  const serverConfig = routeEnvironmentRuntime?.serverConfig ?? null;
   const routeConnectionState =
     routeEnvironmentRuntime?.connectionState ?? (environmentId ? "available" : connectionState);
   const routeConnectionError = routeEnvironmentRuntime?.connectionError ?? null;
+  const viewThread = useAtomCommand(threadEnvironment.view, { reportFailure: false });
+  useEffect(() => {
+    const completedAt = selectedThread?.latestTurn?.completedAt;
+    if (
+      selectedThread === null ||
+      completedAt == null ||
+      serverConfig?.environment.capabilities.threadViewState !== true
+    ) {
+      return;
+    }
+    const viewedAtMs = Date.parse(selectedThread.viewedAt ?? "");
+    const completedAtMs = Date.parse(completedAt);
+    if (
+      Number.isFinite(viewedAtMs) &&
+      Number.isFinite(completedAtMs) &&
+      viewedAtMs >= completedAtMs
+    ) {
+      return;
+    }
+    void viewThread({
+      environmentId: selectedThread.environmentId,
+      input: { threadId: selectedThread.id },
+    });
+  }, [selectedThread, serverConfig?.environment.capabilities.threadViewState, viewThread]);
   const selectedThreadWithDraftSettings = useMemo(
     () =>
       selectedThread
@@ -758,7 +783,6 @@ function ThreadRouteContent(
     detailDeleted: selectedThreadDetailState.status === "deleted",
     connectionState: routeConnectionState,
   });
-  const serverConfig = routeEnvironmentRuntime?.serverConfig ?? null;
   const renderThreadRouteBody = (showActionControls: boolean) => (
     <>
       <ThreadGitControls {...threadGitControlProps} showActionControls={showActionControls} />

@@ -97,6 +97,7 @@ import {
 import { legacyProjectCwdPreferenceKey, useUiStateStore } from "../uiStateStore";
 import { useThreadSelectionStore } from "../threadSelectionStore";
 import { useThreadActions } from "../hooks/useThreadActions";
+import { useThreadViewState } from "../hooks/useThreadViewState";
 import { useHandleNewThread } from "../hooks/useHandleNewThread";
 import { openCommandPalette } from "../commandPaletteBus";
 import { startNewThreadFromContext } from "../lib/chatThreadActions";
@@ -741,7 +742,8 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
   );
   const threadKey = scopedThreadKey(threadRef);
   const isRegeneratingTitle = thread.titleRegeneration != null;
-  const lastVisitedAt = useUiStateStore((state) => state.threadLastVisitedAtById[threadKey]);
+  const localLastVisitedAt = useUiStateStore((state) => state.threadLastVisitedAtById[threadKey]);
+  const lastVisitedAt = thread.viewedAt ?? localLastVisitedAt;
   const isSelected = useThreadSelectionStore((state) => state.selectedThreadKeys.has(threadKey));
   const openPrLink = useOpenPrLink();
   const runningTerminalIds = useThreadRunningTerminalIds({
@@ -1705,13 +1707,12 @@ export default function Sidebar() {
   const setSelectionAnchor = useThreadSelectionStore((s) => s.setAnchor);
   const toggleThreadSelection = useThreadSelectionStore((s) => s.toggleThread);
   const rangeSelectTo = useThreadSelectionStore((s) => s.rangeSelectTo);
-  const markThreadUnread = useUiStateStore((s) => s.markThreadUnread);
-  const markThreadVisited = useUiStateStore((s) => s.markThreadVisited);
+  const { markUnread, markViewed } = useThreadViewState();
   const acknowledgeWoke = useCallback(
     (threadRef: ScopedThreadRef, visitedAt: string) => {
-      markThreadVisited(scopedThreadKey(threadRef), visitedAt);
+      markViewed(threadRef, visitedAt);
     },
-    [markThreadVisited],
+    [markViewed],
   );
   const routeTarget = useParams({
     strict: false,
@@ -2882,7 +2883,12 @@ export default function Sidebar() {
       if (clicked.value === "mark-unread") {
         for (const threadKey of threadKeys) {
           const thread = threadByKeyRef.current.get(threadKey);
-          markThreadUnread(threadKey, thread?.latestTurn?.completedAt);
+          if (thread) {
+            markUnread(
+              scopeThreadRef(thread.environmentId, thread.id),
+              thread.latestTurn?.completedAt,
+            );
+          }
         }
         clearSelection();
         return;
@@ -2934,7 +2940,7 @@ export default function Sidebar() {
       clearSelection,
       confirmThreadDelete,
       deleteThread,
-      markThreadUnread,
+      markUnread,
       performSnooze,
       removeFromSelection,
       serverConfigs,
@@ -3070,7 +3076,10 @@ export default function Sidebar() {
             return;
           }
           case "mark-unread":
-            markThreadUnread(threadKey, thread.latestTurn?.completedAt);
+            markUnread(
+              scopeThreadRef(thread.environmentId, thread.id),
+              thread.latestTurn?.completedAt,
+            );
             return;
           case "copy-path":
             if (!threadWorkspacePath) {
@@ -3138,7 +3147,7 @@ export default function Sidebar() {
       copyThreadIdToClipboard,
       deleteThread,
       handleMultiSelectContextMenu,
-      markThreadUnread,
+      markUnread,
       projectCwdByKey,
       serverConfigs,
       startThreadRename,
