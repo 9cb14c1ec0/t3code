@@ -10,6 +10,8 @@ struct ConnectionsView: View {
     @State private var showingT3Connect = false
     @State private var detailEnvironmentID: String?
     @State private var removalTarget: FeatureEnvironment?
+    @State private var connectingEnvironmentID: String?
+    @State private var connectionErrorMessage: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -18,8 +20,8 @@ struct ConnectionsView: View {
 
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 28) {
-                    connectionList
-                    accountSection
+                    directConnectionsSection
+                    t3ConnectSection
                     accessSection
                 }
                 .padding(.horizontal, 20)
@@ -29,9 +31,13 @@ struct ConnectionsView: View {
         }
         .background(T3Colors.background)
         .toolbar(.hidden, for: .navigationBar)
+        .task {
+            await t3ConnectController?.refresh()
+        }
         .sheet(isPresented: $showingAddConnection) {
             ConnectionOnboardingView(
                 model: model,
+                showsT3ConnectOption: false,
                 onConnected: {
                     showingAddConnection = false
                     Task { await model.reloadAfterConnection() }
@@ -55,7 +61,10 @@ struct ConnectionsView: View {
                 NavigationStack {
                     T3ConnectView(
                         capability: capability,
-                        onConnected: { await model.reloadAfterConnection() }
+                        purpose: .manage,
+                        onUnlinked: { id in
+                            await model.removeEnvironment(id)
+                        }
                     )
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
@@ -103,7 +112,18 @@ struct ConnectionsView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: { environment in
-            Text("\(environment.name) will need a new pairing code to be added again.")
+            Text(removalMessage(for: environment))
+        }
+        .alert(
+            "T3 Connect",
+            isPresented: Binding(
+                get: { connectionErrorMessage != nil },
+                set: { if !$0 { connectionErrorMessage = nil } }
+            )
+        ) {
+            Button("OK") { connectionErrorMessage = nil }
+        } message: {
+            Text(connectionErrorMessage ?? "Something went wrong.")
         }
     }
 
@@ -119,15 +139,14 @@ struct ConnectionsView: View {
 
             Spacer(minLength: 0)
 
-            Text("Connections")
+            Text("Environments")
                 .font(T3Typography.navigationTitle)
                 .foregroundStyle(T3Colors.textPrimary)
 
             Spacer(minLength: 0)
 
-            Button("Add") { showingAddConnection = true }
-                .frame(width: 92, alignment: .trailing)
-                .accessibilityIdentifier("connections-add-button")
+            Color.clear
+                .frame(width: 92)
         }
         .font(T3Typography.control)
         .foregroundStyle(T3Colors.accent)
@@ -135,74 +154,47 @@ struct ConnectionsView: View {
         .frame(minHeight: 54)
     }
 
-    private var connectionList: some View {
+    private var directConnectionsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(connectionSummary.uppercased())
-                .font(T3Typography.eyebrow)
-                .foregroundStyle(T3Colors.textSecondary)
+            HStack(spacing: 12) {
+                Text("DIRECT CONNECTIONS")
+                    .font(T3Typography.eyebrow)
+                    .foregroundStyle(T3Colors.textSecondary)
+                Spacer(minLength: 0)
+                Button("Add") { showingAddConnection = true }
+                    .font(T3Typography.control)
+                    .accessibilityIdentifier("connections-add-button")
+            }
 
-            if model.snapshot.environments.isEmpty {
-                Button {
-                    showingAddConnection = true
-                } label: {
-                    Label("Add your first connection", systemImage: "plus")
-                        .font(T3Typography.threadBody)
-                        .foregroundStyle(T3Colors.accent)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .frame(minHeight: 58)
-                }
-                .buttonStyle(.plain)
-                .overlay(alignment: .bottom) { Divider().overlay(T3Colors.separator) }
+            if directEnvironments.isEmpty {
+                emptyRow("No direct connections")
             } else {
                 VStack(spacing: 0) {
                     Divider().overlay(T3Colors.separator)
-                    ForEach(model.snapshot.environments) { environment in
-                        connectionRow(environment)
+                    ForEach(directEnvironments) { environment in
+                        directConnectionRow(environment)
                         Divider().overlay(T3Colors.separator)
                     }
                 }
             }
-
-            Text("Disabled connections stay saved but stop network activity and disappear from new-task choices.")
-                .font(T3Typography.supporting)
-                .foregroundStyle(T3Colors.textTertiary)
-                .padding(.top, 2)
         }
     }
 
-    private func connectionRow(_ environment: FeatureEnvironment) -> some View {
+    private func directConnectionRow(_ environment: FeatureEnvironment) -> some View {
         HStack(spacing: 12) {
             Button {
                 detailEnvironmentID = environment.id
             } label: {
                 HStack(spacing: 12) {
-                    Image(systemName: environment.source.systemImage)
+                    Image(systemName: "desktopcomputer")
                         .font(.system(size: 18, weight: .medium))
-                        .foregroundStyle(environment.source == .t3Connect
-                            ? T3Colors.accent
-                            : T3Colors.textSecondary)
+                        .foregroundStyle(T3Colors.textSecondary)
                         .frame(width: 25)
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(environment.name)
-                            .font(T3Typography.homeTitle)
-                            .foregroundStyle(T3Colors.textPrimary)
-                            .lineLimit(1)
-
-                        HStack(spacing: 6) {
-                            Circle()
-                                .fill(environment.status.color)
-                                .frame(width: 7, height: 7)
-                            Text(environment.status.title)
-                            Text("·")
-                            Text(environment.source.title)
-                                .foregroundStyle(environment.source == .t3Connect
-                                    ? T3Colors.accent
-                                    : T3Colors.textSecondary)
-                        }
-                        .font(T3Typography.supporting)
-                        .foregroundStyle(T3Colors.textSecondary)
-                    }
+                    environmentLabel(
+                        name: environment.name,
+                        isOnline: environment.connectionState == .connected
+                    )
 
                     Spacer(minLength: 8)
                 }
@@ -226,41 +218,121 @@ struct ConnectionsView: View {
         }
     }
 
-    private var accountSection: some View {
+    private var t3ConnectSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("T3 CONNECT ACCOUNT")
-                .font(T3Typography.eyebrow)
-                .foregroundStyle(T3Colors.textSecondary)
+            HStack(spacing: 12) {
+                Text("T3 CONNECT")
+                    .font(T3Typography.eyebrow)
+                    .foregroundStyle(T3Colors.textSecondary)
+                Spacer(minLength: 0)
+                Button("Manage") { showingT3Connect = true }
+                    .font(T3Typography.control)
+                    .disabled(t3ConnectCapability == nil)
+                    .accessibilityIdentifier("connections-manage-t3-connect-button")
+            }
 
-            Button {
-                showingT3Connect = true
-            } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: "cloud")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundStyle(T3Colors.accent)
-                        .frame(width: 25)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(t3ConnectAccountTitle)
-                            .font(T3Typography.threadBody)
-                            .foregroundStyle(T3Colors.textPrimary)
-                        Text(t3ConnectAccountDetail)
+            if t3ConnectRows.isEmpty {
+                if t3ConnectController?.isRefreshing == true {
+                    HStack(spacing: 10) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Checking T3 Connect")
                             .font(T3Typography.supporting)
                             .foregroundStyle(T3Colors.textSecondary)
                     }
-                    Spacer(minLength: 8)
-                    Image(systemName: "chevron.right")
-                        .font(T3Typography.supportingStrong)
-                        .foregroundStyle(T3Colors.textTertiary)
+                    .frame(minHeight: 58)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .overlay(alignment: .top) { Divider().overlay(T3Colors.separator) }
+                    .overlay(alignment: .bottom) { Divider().overlay(T3Colors.separator) }
+                } else if t3ConnectController?.account == nil {
+                    emptyRow("Sign in to access your T3 Connect machines")
+                } else {
+                    emptyRow("No linked machines")
                 }
-                .frame(minHeight: 58)
-                .contentShape(Rectangle())
+            } else {
+                VStack(spacing: 0) {
+                    Divider().overlay(T3Colors.separator)
+                    ForEach(t3ConnectRows) { item in
+                        t3ConnectConnectionRow(item)
+                        Divider().overlay(T3Colors.separator)
+                    }
+                }
             }
-            .buttonStyle(.plain)
-            .disabled(model.client is any T3ConnectCapable == false)
+
+            Text("Turn on any online machine to use it on this iPhone.")
+                .font(T3Typography.supporting)
+                .foregroundStyle(T3Colors.textTertiary)
+                .padding(.top, 2)
+        }
+    }
+
+    private func t3ConnectConnectionRow(
+        _ item: T3ConnectEnvironmentPresentation
+    ) -> some View {
+        HStack(spacing: 12) {
+            Group {
+                if let environment = item.savedEnvironment {
+                    Button {
+                        detailEnvironmentID = environment.id
+                    } label: {
+                        t3ConnectEnvironmentLabel(item)
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    t3ConnectEnvironmentLabel(item)
+                }
+            }
+
+            Toggle("Enabled", isOn: t3ConnectEnabledBinding(for: item))
+                .labelsHidden()
+                .tint(T3Colors.success)
+                .disabled(isT3ConnectToggleDisabled(item))
+                .accessibilityLabel("Enable \(item.name)")
+        }
+        .frame(minHeight: 70)
+    }
+
+    private func t3ConnectEnvironmentLabel(
+        _ item: T3ConnectEnvironmentPresentation
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "desktopcomputer")
+                .font(.system(size: 18, weight: .medium))
+                .foregroundStyle(T3Colors.textSecondary)
+                .frame(width: 25)
+
+            environmentLabel(name: item.name, isOnline: item.isOnline)
+            Spacer(minLength: 8)
+        }
+        .contentShape(Rectangle())
+    }
+
+    private func environmentLabel(name: String, isOnline: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(name)
+                .font(T3Typography.homeTitle)
+                .foregroundStyle(T3Colors.textPrimary)
+                .lineLimit(1)
+
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(isOnline ? T3Colors.success : T3Colors.danger)
+                    .frame(width: 7, height: 7)
+                Text(isOnline ? "Online" : "Offline")
+            }
+            .font(T3Typography.supporting)
+            .foregroundStyle(T3Colors.textSecondary)
+        }
+    }
+
+    private func emptyRow(_ message: String) -> some View {
+        Text(message)
+            .font(T3Typography.threadBody)
+            .foregroundStyle(T3Colors.textSecondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(minHeight: 58)
             .overlay(alignment: .top) { Divider().overlay(T3Colors.separator) }
             .overlay(alignment: .bottom) { Divider().overlay(T3Colors.separator) }
-        }
     }
 
     private var accessSection: some View {
@@ -306,27 +378,84 @@ struct ConnectionsView: View {
         )
     }
 
-    private var connectionSummary: String {
-        let environments = model.snapshot.environments
-        let online = environments.count {
-            $0.isEnabled && $0.connectionState == .connected
+    private func t3ConnectEnabledBinding(
+        for item: T3ConnectEnvironmentPresentation
+    ) -> Binding<Bool> {
+        Binding(
+            get: { pendingEnabledValues[item.id] ?? item.isEnabled },
+            set: { enabled in
+                pendingEnabledValues[item.id] = enabled
+                Task { await setT3ConnectEnvironment(item, enabled: enabled) }
+            }
+        )
+    }
+
+    private func setT3ConnectEnvironment(
+        _ item: T3ConnectEnvironmentPresentation,
+        enabled: Bool
+    ) async {
+        defer {
+            pendingEnabledValues[item.id] = nil
+            if connectingEnvironmentID == item.id {
+                connectingEnvironmentID = nil
+            }
         }
-        return "\(environments.count) saved · \(online) online"
+
+        if let savedEnvironment = item.savedEnvironment {
+            _ = await model.setEnvironmentEnabled(savedEnvironment.id, enabled: enabled)
+            return
+        }
+
+        guard enabled,
+              let linkedEnvironment = item.linkedEnvironment,
+              let capability = t3ConnectCapability else { return }
+
+        connectingEnvironmentID = item.id
+        do {
+            let credential = try await capability.t3ConnectController.credential(
+                for: linkedEnvironment.environment
+            )
+            try await capability.connectT3Environment(credential)
+            await model.reloadAfterConnection()
+        } catch {
+            connectionErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func isT3ConnectToggleDisabled(
+        _ item: T3ConnectEnvironmentPresentation
+    ) -> Bool {
+        pendingEnabledValues[item.id] != nil
+            || (connectingEnvironmentID != nil && connectingEnvironmentID != item.id)
+            || t3ConnectController?.busyEnvironmentID != nil
+    }
+
+    private var directEnvironments: [FeatureEnvironment] {
+        ConnectionHubPresentation.directEnvironments(in: model.snapshot.environments)
+    }
+
+    private var t3ConnectRows: [T3ConnectEnvironmentPresentation] {
+        ConnectionHubPresentation.t3ConnectEnvironments(
+            saved: model.snapshot.environments,
+            linked: t3ConnectController?.environments ?? []
+        )
+    }
+
+    private var t3ConnectCapability: (any T3ConnectCapable)? {
+        model.client as? any T3ConnectCapable
     }
 
     private var t3ConnectController: T3ConnectController? {
-        (model.client as? any T3ConnectCapable)?.t3ConnectController
+        t3ConnectCapability?.t3ConnectController
     }
 
-    private var t3ConnectAccountTitle: String {
-        t3ConnectController?.account?.email ?? "T3 Connect"
-    }
-
-    private var t3ConnectAccountDetail: String {
-        guard let controller = t3ConnectController else { return "Unavailable in this build" }
-        guard controller.account != nil else { return "Sign in or manage cloud connections" }
-        let count = model.snapshot.environments.count { $0.source == .t3Connect }
-        return "Signed in · \(count) \(count == 1 ? "connection" : "connections")"
+    private func removalMessage(for environment: FeatureEnvironment) -> String {
+        switch environment.source {
+        case .direct:
+            "\(environment.name) will need a new pairing code to be added again."
+        case .t3Connect:
+            "\(environment.name) will remain linked to your T3 Connect account."
+        }
     }
 
     private var deviceManager: any FeatureDeviceManaging {
@@ -386,7 +515,7 @@ private struct ConnectionDetailView: View {
             Button("Remove", role: .destructive, action: onRemove)
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("A new pairing code will be required to add it again.")
+            Text(removalMessage)
         }
     }
 
@@ -396,6 +525,13 @@ private struct ConnectionDetailView: View {
 
     private var projectCount: Int {
         model.snapshot.projects.count { $0.environmentID == environmentID }
+    }
+
+    private var removalMessage: String {
+        guard environment?.source == .t3Connect else {
+            return "A new pairing code will be required to add it again."
+        }
+        return "It will remain linked to your T3 Connect account."
     }
 
     private func enabledBinding(for environment: FeatureEnvironment) -> Binding<Bool> {
@@ -420,12 +556,6 @@ private extension FeatureEnvironment.Source {
         }
     }
 
-    var systemImage: String {
-        switch self {
-        case .direct: "desktopcomputer"
-        case .t3Connect: "cloud"
-        }
-    }
 }
 
 private extension FeatureEnvironment {

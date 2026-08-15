@@ -335,8 +335,9 @@ public final class T3ConnectController: T3ConnectDeviceManaging {
         return credential
     }
 
-    public func unlink(_ environment: T3ConnectRelayEnvironment) async {
-        guard let auth, let relay else { return }
+    @discardableResult
+    public func unlink(_ environment: T3ConnectRelayEnvironment) async -> Bool {
+        guard let auth, let relay else { return false }
         busyEnvironmentID = environment.environmentId
         defer { busyEnvironmentID = nil }
         do {
@@ -348,10 +349,12 @@ public final class T3ConnectController: T3ConnectDeviceManaging {
                 environmentID: environment.environmentId,
                 clerkToken: token
             )
-            guard isAuthorizationCurrent(generation) else { return }
+            guard isAuthorizationCurrent(generation) else { return false }
             environments.removeAll { $0.id == environment.environmentId }
+            return true
         } catch {
             errorMessage = error.localizedDescription
+            return false
         }
     }
 

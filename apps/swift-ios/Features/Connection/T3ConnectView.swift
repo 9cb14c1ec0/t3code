@@ -3,6 +3,11 @@ import ClerkKitUI
 import SwiftUI
 
 public struct T3ConnectView: View {
+    public enum Purpose: Sendable {
+        case connect
+        case manage
+    }
+
     @SwiftUI.Environment(\.dismiss) private var dismiss
     @Bindable private var controller: T3ConnectController
     @State private var isAuthPresented = false
@@ -13,15 +18,21 @@ public struct T3ConnectView: View {
         @MainActor (T3ConnectManagedEnvironmentCredential) async throws -> Void
     private let signOut: @MainActor () async -> Void
     private let onConnected: @MainActor () async -> Void
+    private let onUnlinked: @MainActor (String) async -> Void
+    private let purpose: Purpose
 
     public init(
         capability: any T3ConnectCapable,
-        onConnected: @escaping @MainActor () async -> Void = {}
+        purpose: Purpose = .connect,
+        onConnected: @escaping @MainActor () async -> Void = {},
+        onUnlinked: @escaping @MainActor (String) async -> Void = { _ in }
     ) {
         controller = capability.t3ConnectController
         connectEnvironment = capability.connectT3Environment
         signOut = capability.signOutT3Connect
+        self.purpose = purpose
         self.onConnected = onConnected
+        self.onUnlinked = onUnlinked
     }
 
     public var body: some View {
@@ -183,10 +194,10 @@ public struct T3ConnectView: View {
     }
 
     private var environmentSection: some View {
-        Section("Cloud environments") {
+        Section(purpose == .manage ? "Linked machines" : "Cloud environments") {
             if controller.environments.isEmpty, !controller.isRefreshing {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("No linked environments")
+                    Text("No linked machines")
                         .font(T3Typography.homeTitle)
                     Text("Link an environment from T3 Code on desktop, then pull to refresh.")
                         .font(T3Typography.supporting)
@@ -201,7 +212,11 @@ public struct T3ConnectView: View {
                     .listRowBackground(T3Colors.background)
                     .swipeActions {
                         Button(role: .destructive) {
-                            Task { await controller.unlink(item.environment) }
+                            Task {
+                                if await controller.unlink(item.environment) {
+                                    await onUnlinked(item.id)
+                                }
+                            }
                         } label: {
                             Label("Unlink", systemImage: "link.badge.minus")
                         }
@@ -240,24 +255,26 @@ public struct T3ConnectView: View {
 
             Spacer(minLength: 8)
 
-            Button {
-                Task { await handleConnect(item.environment) }
-            } label: {
-                if controller.busyEnvironmentID == item.id
-                    || connectingEnvironmentID == item.id {
-                    ProgressView()
-                        .frame(width: 54)
-                } else {
-                    Text("Connect")
-                        .font(T3Typography.supportingStrong)
+            if purpose == .connect {
+                Button {
+                    Task { await handleConnect(item.environment) }
+                } label: {
+                    if controller.busyEnvironmentID == item.id
+                        || connectingEnvironmentID == item.id {
+                        ProgressView()
+                            .frame(width: 54)
+                    } else {
+                        Text("Connect")
+                            .font(T3Typography.supportingStrong)
+                    }
                 }
+                .buttonStyle(.borderless)
+                .disabled(
+                    controller.busyEnvironmentID != nil
+                        || connectingEnvironmentID != nil
+                        || item.status?.status == .offline
+                )
             }
-            .buttonStyle(.borderless)
-            .disabled(
-                controller.busyEnvironmentID != nil
-                    || connectingEnvironmentID != nil
-                    || item.status?.status == .offline
-            )
         }
         .padding(.vertical, 5)
     }

@@ -92,13 +92,12 @@ public struct SettingsView: View {
     }
 
     private var connectionSection: some View {
-        SettingsSection(title: "Connections") {
+        SettingsSection(title: "Environments") {
             NavigationLink {
                 ConnectionsView(model: model)
             } label: {
                 SettingsNavigationRow(
-                    title: "Connections",
-                    value: connectionSummary,
+                    title: "Environments",
                     systemImage: "server.rack"
                 )
             }
@@ -196,14 +195,6 @@ public struct SettingsView: View {
 
     private var canSave: Bool {
         !isSaving && settings != model.snapshot.settings
-    }
-
-    private var connectionSummary: String {
-        let environments = model.snapshot.environments
-        let online = environments.count {
-            $0.isEnabled && $0.connectionState == .connected
-        }
-        return "\(online) online · \(environments.count) saved"
     }
 
     @MainActor
