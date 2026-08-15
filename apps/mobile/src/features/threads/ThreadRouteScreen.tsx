@@ -96,6 +96,13 @@ function firstRouteParam(value: string | string[] | undefined): string | null {
   return value ?? null;
 }
 
+function timestampCovers(timestamp: string | undefined, target: string): boolean {
+  if (timestamp === undefined) return false;
+  const timestampMs = Date.parse(timestamp);
+  const targetMs = Date.parse(target);
+  return Number.isFinite(timestampMs) && Number.isFinite(targetMs) && timestampMs >= targetMs;
+}
+
 function OpeningThreadLoadingScreen() {
   return <LoadingScreen message="Opening thread…" messagePlacement="above-spinner" />;
 }
@@ -288,6 +295,8 @@ function ThreadRouteContent(
   const selectedThreadEnvironmentId = selectedThread?.environmentId ?? null;
   const selectedThreadId = selectedThread?.id ?? null;
   const selectedThreadCompletedAt = selectedThread?.latestTurn?.completedAt ?? null;
+  const selectedThreadViewedAtRef = useRef(selectedThread?.viewedAt);
+  selectedThreadViewedAtRef.current = selectedThread?.viewedAt;
   const supportsThreadViewState = serverConfig?.environment.capabilities.threadViewState === true;
   useFocusEffect(
     useCallback(() => {
@@ -297,6 +306,9 @@ function ThreadRouteContent(
         selectedThreadCompletedAt === null ||
         !supportsThreadViewState
       ) {
+        return;
+      }
+      if (timestampCovers(selectedThreadViewedAtRef.current, selectedThreadCompletedAt)) {
         return;
       }
       void viewThread({
