@@ -7,6 +7,7 @@
  * @module IntegrationsSettings
  */
 import {
+  DEFAULT_BROWSER_AUTO_SHOW_FLOATING_PREVIEW,
   DEFAULT_BROWSER_VIEWPORT,
   DEFAULT_PREVIEW_APPEARANCE,
   DEFAULT_PREVIEW_ZOOM_FACTOR,
@@ -19,9 +20,11 @@ import {
   type PreviewViewportSetting,
 } from "@t3tools/contracts";
 import { PREVIEW_VIEWPORT_PRESETS } from "@t3tools/shared/previewViewport";
-import { useState } from "react";
 
-import { Input } from "../ui/input";
+import { ScreenRotationIcon } from "~/browser/ScreenRotationIcon";
+
+import { Button } from "../ui/button";
+import { NumberField, NumberFieldGroup, NumberFieldInput } from "../ui/number-field";
 import {
   Select,
   SelectGroup,
@@ -31,6 +34,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
+import { Switch } from "../ui/switch";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { useClientSettings, useUpdatePrimarySettings } from "~/hooks/useSettings";
 
 import {
@@ -50,6 +55,8 @@ const RESPONSIVE_VALUE = "responsive";
  * over, so the picker needs something concrete to seed the inputs with.
  */
 const RESPONSIVE_SEED_SIZE = { width: 1280, height: 800 } as const;
+
+const NO_GROUPING: Intl.NumberFormatOptions = { useGrouping: false };
 
 const APPEARANCE_LABELS: Readonly<Record<PreviewAppearancePreference, string>> = {
   system: "System",
@@ -87,21 +94,31 @@ const isValidDimension = (value: number) =>
   value >= PREVIEW_VIEWPORT_MIN_DIMENSION &&
   value <= PREVIEW_VIEWPORT_MAX_DIMENSION;
 
+/**
+ * A sized viewport with width and height swapped. Presets keep their identity
+ * through a rotation — `resolvePreviewViewport` already stores rotated presets
+ * as the preset id plus swapped dimensions — so a rotated iPad is still an
+ * iPad, not an anonymous custom size.
+ */
+const rotateViewport = (
+  viewport: Exclude<PreviewViewportSetting, { readonly _tag: "fill" }>,
+): PreviewViewportSetting => ({
+  ...viewport,
+  width: viewport.height,
+  height: viewport.width,
+});
+
 function BrowserViewportSetting() {
   const viewport = useClientSettings((settings) => settings.browserDefaultViewport);
   const updateSettings = useUpdatePrimarySettings();
-  // Held while typing so a half-entered width (e.g. "12") isn't persisted as a
-  // rejected value; committed on blur/Enter once both dimensions are valid.
-  const [draftSize, setDraftSize] = useState<{ width: string; height: string } | null>(null);
 
   const sized = viewport._tag === "fill" ? null : viewport;
-  const presentedSize = draftSize ?? {
-    width: String(sized?.width ?? RESPONSIVE_SEED_SIZE.width),
-    height: String(sized?.height ?? RESPONSIVE_SEED_SIZE.height),
+  const presentedSize = {
+    width: sized?.width ?? RESPONSIVE_SEED_SIZE.width,
+    height: sized?.height ?? RESPONSIVE_SEED_SIZE.height,
   };
 
   const selectViewport = (value: string | null) => {
-    setDraftSize(null);
     if (value === FILL_VALUE) {
       updateSettings({ browserDefaultViewport: FILL_PREVIEW_VIEWPORT });
       return;
@@ -128,21 +145,16 @@ function BrowserViewportSetting() {
     });
   };
 
-  const commitDraftSize = () => {
-    if (!draftSize) return;
-    const width = Number(draftSize.width);
-    const height = Number(draftSize.height);
-    setDraftSize(null);
-    if (
-      !isValidDimension(width) ||
-      !isValidDimension(height) ||
-      width * height > PREVIEW_VIEWPORT_MAX_AREA
-    ) {
-      return;
-    }
-    if (sized && width === sized.width && height === sized.height) return;
+  // Committed on blur rather than per keystroke: typing "2560" passes through
+  // "256", which is a legal dimension, so an onValueChange handler would
+  // persist that intermediate size and churn the settings file on every key.
+  const commitDimension = (axis: "width" | "height", value: number | null) => {
+    if (value === null || !isValidDimension(value)) return;
+    const next = { ...presentedSize, [axis]: value };
+    if (next.width * next.height > PREVIEW_VIEWPORT_MAX_AREA) return;
+    if (sized && next.width === sized.width && next.height === sized.height) return;
     // Typing a size means the preset no longer describes it.
-    updateSettings({ browserDefaultViewport: { _tag: "freeform", width, height } });
+    updateSettings({ browserDefaultViewport: { _tag: "freeform", ...next } });
   };
 
   return (
@@ -153,10 +165,7 @@ function BrowserViewportSetting() {
         viewport._tag !== DEFAULT_BROWSER_VIEWPORT._tag ? (
           <SettingResetButton
             label="default browser viewport"
-            onClick={() => {
-              setDraftSize(null);
-              updateSettings({ browserDefaultViewport: DEFAULT_BROWSER_VIEWPORT });
-            }}
+            onClick={() => updateSettings({ browserDefaultViewport: DEFAULT_BROWSER_VIEWPORT })}
           />
         ) : null
       }
@@ -186,42 +195,55 @@ function BrowserViewportSetting() {
           </Select>
 
           {sized ? (
-            <form
-              className="m-0 flex shrink-0 items-center gap-1 border-0 p-0"
-              aria-label="Default viewport dimensions"
-              onSubmit={(event) => {
-                event.preventDefault();
-                commitDraftSize();
-              }}
-            >
-              <Input
-                nativeInput
-                type="number"
-                inputMode="numeric"
-                size="sm"
-                className="w-16"
-                aria-label="Default viewport width"
-                min={PREVIEW_VIEWPORT_MIN_DIMENSION}
-                max={PREVIEW_VIEWPORT_MAX_DIMENSION}
+            <div className="flex shrink-0 items-center gap-1">
+              <NumberField
                 value={presentedSize.width}
-                onChange={(event) => setDraftSize({ ...presentedSize, width: event.target.value })}
-                onBlur={commitDraftSize}
-              />
-              <span className="text-xs text-muted-foreground">×</span>
-              <Input
-                nativeInput
-                type="number"
-                inputMode="numeric"
-                size="sm"
-                className="w-16"
-                aria-label="Default viewport height"
                 min={PREVIEW_VIEWPORT_MIN_DIMENSION}
                 max={PREVIEW_VIEWPORT_MAX_DIMENSION}
+                // Pixel counts read as raw numbers; grouping would show "1,024".
+                format={NO_GROUPING}
+                size="sm"
+                className="w-24"
+                onValueCommitted={(value) => commitDimension("width", value)}
+              >
+                <NumberFieldGroup>
+                  <NumberFieldInput aria-label="Default viewport width" />
+                </NumberFieldGroup>
+              </NumberField>
+              <span className="text-xs text-muted-foreground">×</span>
+              <NumberField
                 value={presentedSize.height}
-                onChange={(event) => setDraftSize({ ...presentedSize, height: event.target.value })}
-                onBlur={commitDraftSize}
-              />
-            </form>
+                min={PREVIEW_VIEWPORT_MIN_DIMENSION}
+                max={PREVIEW_VIEWPORT_MAX_DIMENSION}
+                format={NO_GROUPING}
+                size="sm"
+                className="w-24"
+                onValueCommitted={(value) => commitDimension("height", value)}
+              >
+                <NumberFieldGroup>
+                  <NumberFieldInput aria-label="Default viewport height" />
+                </NumberFieldGroup>
+              </NumberField>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      size="icon-sm"
+                      variant="ghost-muted"
+                      aria-label={`Rotate to ${
+                        presentedSize.height >= presentedSize.width ? "landscape" : "portrait"
+                      }`}
+                      onClick={() =>
+                        updateSettings({ browserDefaultViewport: rotateViewport(sized) })
+                      }
+                    >
+                      <ScreenRotationIcon />
+                    </Button>
+                  }
+                />
+                <TooltipPopup side="top">Rotate</TooltipPopup>
+              </Tooltip>
+            </div>
           ) : null}
         </div>
       }
@@ -312,6 +334,39 @@ function BrowserAppearanceSetting() {
   );
 }
 
+function BrowserAutoShowFloatingPreviewSetting() {
+  const autoShow = useClientSettings((settings) => settings.browserAutoShowFloatingPreview);
+  const updateSettings = useUpdatePrimarySettings();
+
+  return (
+    <SettingsRow
+      {...searchableSetting("browser-auto-show-floating-preview")}
+      description="Pop the floating preview into view when an agent opens a browser. An agent that explicitly asks to show or hide its preview still gets what it asked for."
+      resetAction={
+        autoShow !== DEFAULT_BROWSER_AUTO_SHOW_FLOATING_PREVIEW ? (
+          <SettingResetButton
+            label="auto-show floating preview"
+            onClick={() =>
+              updateSettings({
+                browserAutoShowFloatingPreview: DEFAULT_BROWSER_AUTO_SHOW_FLOATING_PREVIEW,
+              })
+            }
+          />
+        ) : null
+      }
+      control={
+        <Switch
+          checked={autoShow}
+          onCheckedChange={(checked) =>
+            updateSettings({ browserAutoShowFloatingPreview: Boolean(checked) })
+          }
+          aria-label="Auto-show floating preview"
+        />
+      }
+    />
+  );
+}
+
 export function IntegrationsSettingsPanel() {
   return (
     <SettingsPageContainer>
@@ -319,6 +374,7 @@ export function IntegrationsSettingsPanel() {
         <BrowserViewportSetting />
         <BrowserZoomSetting />
         <BrowserAppearanceSetting />
+        <BrowserAutoShowFloatingPreviewSetting />
       </SettingsSection>
     </SettingsPageContainer>
   );

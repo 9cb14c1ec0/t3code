@@ -216,6 +216,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     targetId: "browser",
   },
   {
+    id: "browser-auto-show-floating-preview",
+    title: "Auto-show floating preview",
+    to: "/settings/integrations",
+    targetId: "browser",
+  },
+  {
     id: "source-control",
     title: "Source control",
     to: "/settings/source-control",

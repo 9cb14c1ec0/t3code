@@ -17,8 +17,16 @@ export const DEFAULT_PREVIEW_AUTOMATION_VIEWPORT = {
   height: 800,
 } as const satisfies PreviewViewportSetting;
 
-export function shouldOpenPreviewMiniPlayer(input: PreviewAutomationOpenInput): boolean {
-  return input.open ?? input.show ?? true;
+/**
+ * An explicit `open`/`show` is the agent deliberately surfacing or suppressing
+ * its work, so it outranks the preference; the setting only decides what
+ * happens when the agent said nothing either way.
+ */
+export function shouldOpenPreviewMiniPlayer(
+  input: PreviewAutomationOpenInput,
+  autoShowFloatingPreview = true,
+): boolean {
+  return input.open ?? input.show ?? autoShowFloatingPreview;
 }
 
 export function previewAutomationOpenNeedsOverlay(
