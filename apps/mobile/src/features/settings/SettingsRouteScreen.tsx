@@ -712,7 +712,7 @@ function LegacySettingsSection() {
   const preferences = useAtomValue(mobilePreferencesAtom);
   const threadListV2Enabled = useThreadListV2Enabled();
   const planModeEnabled =
-    AsyncResult.isSuccess(preferences) && preferences.value.planModeEnabled === true;
+    AsyncResult.isSuccess(preferences) && preferences.value.planModeEnabled !== false;
 
   return (
     <View className="gap-3">
