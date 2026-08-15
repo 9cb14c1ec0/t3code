@@ -250,7 +250,7 @@ function LegacySettingsSection() {
   const savePreferences = useAtomSet(updateMobilePreferencesAtom);
   const preferences = useAtomValue(mobilePreferencesAtom);
   const planModeEnabled =
-    AsyncResult.isSuccess(preferences) && preferences.value.planModeEnabled === true;
+    AsyncResult.isSuccess(preferences) && preferences.value.planModeEnabled !== false;
 
   return (
     <View className="gap-3">
