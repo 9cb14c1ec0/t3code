@@ -21,6 +21,7 @@ import {
 } from "@t3tools/contracts";
 import { PREVIEW_VIEWPORT_PRESETS } from "@t3tools/shared/previewViewport";
 import { InfoIcon } from "lucide-react";
+import type { ReactNode } from "react";
 
 import { ScreenRotationIcon } from "~/browser/ScreenRotationIcon";
 import { isElectron } from "../../env";
@@ -380,20 +381,30 @@ function BrowserAutoShowFloatingPreviewSetting({ disabled }: { readonly disabled
 }
 
 /**
- * The preview browser is a Chromium guest the desktop app hosts, so these
- * defaults only mean anything there. They are also *client-local*, which is the
- * reason for disabling rather than hiding: editing them from a browser tab
- * would silently write preferences that belong to a different client, reading
- * as though the desktop app had been configured when it hadn't.
+ * Frames the client-local preview defaults as one unavailable block.
+ *
+ * Disabling each control on its own left the labels and descriptions at full
+ * strength, so the group still read as editable. Boxing it puts the reason at
+ * the top and dims everything it covers, which is also why the explanation
+ * sits outside the dimmed area — the one part that must stay readable is the
+ * part saying why the rest isn't.
+ *
+ * Disabled rather than hidden because these are *client* settings: editing
+ * them from a browser tab would write preferences belonging to a different
+ * client, reading as though the desktop app had been configured when it
+ * hadn't.
  */
-function DesktopOnlyBrowserNotice() {
+function DesktopOnlyBrowserDefaults({ children }: { readonly children: ReactNode }) {
   return (
-    <div className="flex items-start gap-2 rounded-xl px-3 py-2.5 text-[12px] leading-relaxed text-muted-foreground sm:px-4">
-      <InfoIcon className="mt-0.5 size-3.5 shrink-0 text-warning" />
-      <p>
-        The in-app browser runs in the desktop app. These defaults apply to it and can only be
-        changed there.
-      </p>
+    <div className="rounded-xl border border-border/60 bg-muted/20 py-1.5">
+      <div className="flex items-start gap-2 px-3 py-2 text-[12px] leading-relaxed text-muted-foreground sm:px-4">
+        <InfoIcon className="mt-0.5 size-3.5 shrink-0 text-warning" />
+        <p>
+          The in-app browser runs in the desktop app. These defaults apply to it and can only be
+          changed there.
+        </p>
+      </div>
+      <div className="opacity-64">{children}</div>
     </div>
   );
 }
@@ -401,15 +412,23 @@ function DesktopOnlyBrowserNotice() {
 export function IntegrationsSettingsPanel() {
   // Client-local preview defaults are editable only where the preview exists.
   const previewDefaultsDisabled = !isElectron;
+  const previewDefaults = (
+    <>
+      <BrowserViewportSetting disabled={previewDefaultsDisabled} />
+      <BrowserZoomSetting disabled={previewDefaultsDisabled} />
+      <BrowserAppearanceSetting disabled={previewDefaultsDisabled} />
+      <BrowserAutoShowFloatingPreviewSetting disabled={previewDefaultsDisabled} />
+    </>
+  );
 
   return (
     <SettingsPageContainer>
       <SettingsSection id="browser" title="Browser">
-        {previewDefaultsDisabled ? <DesktopOnlyBrowserNotice /> : null}
-        <BrowserViewportSetting disabled={previewDefaultsDisabled} />
-        <BrowserZoomSetting disabled={previewDefaultsDisabled} />
-        <BrowserAppearanceSetting disabled={previewDefaultsDisabled} />
-        <BrowserAutoShowFloatingPreviewSetting disabled={previewDefaultsDisabled} />
+        {previewDefaultsDisabled ? (
+          <DesktopOnlyBrowserDefaults>{previewDefaults}</DesktopOnlyBrowserDefaults>
+        ) : (
+          previewDefaults
+        )}
       </SettingsSection>
     </SettingsPageContainer>
   );
