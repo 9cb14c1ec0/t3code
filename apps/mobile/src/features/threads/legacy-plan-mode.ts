@@ -3,11 +3,13 @@ import {
   type ProviderInteractionMode,
 } from "@t3tools/contracts";
 
+// Fork: plan mode defaults to on (upstream hides it unless opted in). Only an
+// explicit opt-out in Settings → Legacy hides the Build/Plan toggle.
 export function resolveLegacyPlanModeEnabled(input: {
   readonly loaded: boolean;
   readonly preference: boolean | undefined;
 }): boolean {
-  return input.loaded && input.preference === true;
+  return input.loaded && input.preference !== false;
 }
 
 export function resolvePendingTaskInteractionMode(input: {
