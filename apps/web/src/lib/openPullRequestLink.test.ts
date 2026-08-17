@@ -142,6 +142,19 @@ describe("parseChangeRequestUrl", () => {
     });
   });
 
+  it("reads a Forgejo or Gitea pull request, including a self-hosted host", () => {
+    expect(parseChangeRequestUrl("https://codeberg.org/owner/repo/pulls/8")).toEqual({
+      host: "codeberg.org",
+      repository: "owner/repo",
+      number: 8,
+    });
+    expect(parseChangeRequestUrl("https://git.example.org/owner/repo/pulls/8")).toEqual({
+      host: "git.example.org",
+      repository: "owner/repo",
+      number: 8,
+    });
+  });
+
   it("reads both Azure DevOps URL forms, keeping `_git` in the repository path", () => {
     expect(
       parseChangeRequestUrl("https://dev.azure.com/acme/platform/_git/t3code/pullrequest/17"),
