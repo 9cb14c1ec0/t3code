@@ -109,6 +109,10 @@ export function parseChangeRequestUrl(targetUrl: string): ChangeRequestLink | nu
     const match = /^\/([^/]+\/[^/]+)\/pull-requests\/(\d+)(?:\/|$)/u.exec(url.pathname);
     return claim(host, match);
   }
+  // Forgejo / Gitea / Codeberg: /{owner}/{repo}/pulls/{n}. The `/pulls/` segment is
+  // their own (GitHub uses `/pull/`), so a self-hosted instance can keep any hostname.
+  const forgejo = /^\/([^/]+\/[^/]+)\/pulls\/(\d+)(?:\/|$)/u.exec(url.pathname);
+  if (forgejo) return claim(host, forgejo);
   // Azure DevOps, both the current host and the per-organisation one it replaced. `_git` is part
   // of the repository path there, as it is in the remote URL the identity is read from.
   if (isHostOf(host, "dev.azure.com") || host.endsWith(".visualstudio.com")) {
