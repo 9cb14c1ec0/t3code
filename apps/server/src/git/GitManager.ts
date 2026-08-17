@@ -1190,11 +1190,37 @@ export const make = Effect.gen(function* () {
       branch === null
         ? "origin"
         : ((yield* readConfigValueNullable(cwd, `branch.${branch}.remote`)) ?? "origin");
+    const preferredRemoteUrl = yield* readConfigValueNullable(
+      cwd,
+      `remote.${preferredRemoteName}.url`,
+    );
+    const remoteName = preferredRemoteUrl ? preferredRemoteName : "origin";
     const remoteUrl =
-      (yield* readConfigValueNullable(cwd, `remote.${preferredRemoteName}.url`)) ??
-      (yield* readConfigValueNullable(cwd, "remote.origin.url"));
+      preferredRemoteUrl ?? (yield* readConfigValueNullable(cwd, "remote.origin.url"));
+    if (!remoteUrl) return null;
 
-    return remoteUrl ? detectSourceControlProviderFromGitRemoteUrl(remoteUrl) : null;
+    const detected = detectSourceControlProviderFromGitRemoteUrl(remoteUrl);
+    if (detected && detected.kind !== "unknown") {
+      return detected;
+    }
+
+    // Forgejo and Gitea have no single canonical hostname, so static detection returns
+    // "unknown" for most self-hosted instances. Refine this branch's remote via `fj auth
+    // list` (not origin), and only adopt the result when it resolves to Forgejo so other
+    // providers keep their existing status behavior.
+    if (!detected) return null;
+    const handle = yield* sourceControlProviders
+      .resolveHandle({
+        cwd,
+        context: {
+          provider: detected,
+          remoteName,
+          remoteUrl,
+        },
+      })
+      .pipe(Effect.orElseSucceed(() => null));
+    const refined = handle?.context?.provider;
+    return refined?.kind === "forgejo" ? refined : detected;
   });
 
   const resolveRemoteRepositoryContext = Effect.fn("resolveRemoteRepositoryContext")(function* (
