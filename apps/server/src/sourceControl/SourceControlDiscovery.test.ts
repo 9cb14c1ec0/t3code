@@ -12,6 +12,7 @@ import * as VcsProcess from "../vcs/VcsProcess.ts";
 import * as AzureDevOpsCli from "./AzureDevOpsCli.ts";
 import * as BitbucketApi from "./BitbucketApi.ts";
 import * as ForgejoApi from "./ForgejoApi.ts";
+import * as GiteaApi from "./GiteaApi.ts";
 import * as GitHubCli from "./GitHubCli.ts";
 import * as GitLabCli from "./GitLabCli.ts";
 import * as SourceControlDiscovery from "./SourceControlDiscovery.ts";
@@ -30,6 +31,7 @@ const sourceControlProviderRegistryTestLayer = (input: {
         Layer.mock(AzureDevOpsCli.AzureDevOpsCli)({}),
         Layer.mock(BitbucketApi.BitbucketApi)(input.bitbucket),
         Layer.mock(ForgejoApi.ForgejoApi)({}),
+        Layer.mock(GiteaApi.GiteaApi)({}),
         Layer.mock(GitHubCli.GitHubCli)({}),
         Layer.mock(GitLabCli.GitLabCli)({}),
         Layer.mock(VcsDriverRegistry.VcsDriverRegistry)({}),
@@ -169,6 +171,12 @@ it.effect("reports implemented tools separately from locally available executabl
           auth: "unknown",
           account: Option.none(),
         },
+        {
+          kind: "gitea",
+          status: "missing",
+          auth: "unknown",
+          account: Option.none(),
+        },
       ],
     );
     const bitbucket = result.sourceControlProviders.find((item) => item.kind === "bitbucket");
@@ -221,6 +229,16 @@ Logged in to gitlab.com as gitlab-user
       }
       if (input.command === "fj" && input.args.join(" ") === "auth list") {
         return Effect.succeed(processOutput("owner@git.example.org\n"));
+      }
+      if (input.command === "tea" && input.args[0] === "--version") {
+        return Effect.succeed(processOutput("Version: 0.11.1\n"));
+      }
+      if (input.command === "tea" && input.args.join(" ") === "login list --output json") {
+        return Effect.succeed(
+          processOutput(
+            JSON.stringify([{ name: "gitea.com", url: "https://gitea.com", user: "tea-user" }]),
+          ),
+        );
       }
       return Effect.fail(
         new VcsProcessSpawnError({
@@ -295,6 +313,12 @@ Logged in to gitlab.com as gitlab-user
           kind: "forgejo",
           auth: "authenticated",
           account: Option.some("owner"),
+          detail: Option.none(),
+        },
+        {
+          kind: "gitea",
+          auth: "authenticated",
+          account: Option.some("tea-user"),
           detail: Option.none(),
         },
       ],

@@ -25,7 +25,7 @@ import type { EnvironmentProject } from "../state/models.ts";
 
 export type AddProjectRemoteProviderKind = Extract<
   SourceControlProviderKind,
-  "github" | "gitlab" | "bitbucket" | "azure-devops" | "forgejo"
+  "github" | "gitlab" | "bitbucket" | "azure-devops" | "forgejo" | "gitea"
 >;
 export type AddProjectRemoteSource = AddProjectRemoteProviderKind | "url";
 
@@ -62,6 +62,7 @@ const ADD_PROJECT_REMOTE_SOURCES: ReadonlyArray<AddProjectRemoteSource> = [
   "bitbucket",
   "azure-devops",
   "forgejo",
+  "gitea",
 ];
 
 const ADD_PROJECT_REMOTE_PROVIDER_SOURCES: ReadonlyArray<AddProjectRemoteProviderKind> = [
@@ -70,6 +71,7 @@ const ADD_PROJECT_REMOTE_PROVIDER_SOURCES: ReadonlyArray<AddProjectRemoteProvide
   "bitbucket",
   "azure-devops",
   "forgejo",
+  "gitea",
 ];
 
 export function addProjectRemoteSourceLabel(source: AddProjectRemoteSource): string {
@@ -84,6 +86,8 @@ export function addProjectRemoteSourceLabel(source: AddProjectRemoteSource): str
       return "Azure DevOps";
     case "forgejo":
       return "Forgejo";
+    case "gitea":
+      return "Gitea";
     case "url":
       return "Git URL";
   }
@@ -100,6 +104,8 @@ export function addProjectRemoteSourcePathHint(source: AddProjectRemoteSource): 
     case "azure-devops":
       return "project/repository";
     case "forgejo":
+      return "host/owner/repo";
+    case "gitea":
       return "host/owner/repo";
     case "url":
       return "URL";
@@ -162,6 +168,7 @@ export function buildAddProjectRemoteSourceReadiness(
     bitbucket: unavailable,
     "azure-devops": unavailable,
     forgejo: unavailable,
+    gitea: unavailable,
   };
 
   if (!discovery) {
