@@ -572,7 +572,16 @@ export const make = Effect.gen(function* () {
           });
         }
 
-        const omitPrefix = (yield* serverSettingsService.getSettings).omitT3CodeBranchPrefix;
+        const omitPrefix = (yield* serverSettingsService.getSettings.pipe(
+          Effect.mapError(
+            (cause) =>
+              new ForgejoApiError({
+                operation: "checkoutPullRequest",
+                detail: "Failed to get server settings.",
+                cause,
+              }),
+          ),
+        )).omitT3CodeBranchPrefix;
         const localBranch = buildPullRequestCheckoutBranchName({
           pullRequestId: pullRequest.number,
           headBranch: remoteBranch,
