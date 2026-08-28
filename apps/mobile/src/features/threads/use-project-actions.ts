@@ -22,12 +22,14 @@ import { randomHex } from "../../lib/uuid";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { scheduleUnusedComposerAttachmentCleanup } from "../../state/use-composer-drafts";
 import { setPendingConnectionError } from "../../state/use-remote-environment-registry";
+import { useServerConfigs } from "../../state/entities";
 import { validateProjectThreadCreation } from "./projectThreadCreationValidation";
 import { appAtomRegistry } from "../../state/atom-registry";
 import { serverEnvironment } from "../../state/server";
 
 export function useCreateProjectThread() {
   const startTurn = useAtomCommand(threadEnvironment.startTurn, { reportFailure: false });
+  const serverConfigs = useServerConfigs();
 
   return useCallback(
     async (input: {
@@ -126,7 +128,11 @@ export function useCreateProjectThread() {
           branch: input.branch,
           worktreePath: input.worktreePath,
           startFromOrigin: input.startFromOrigin ?? false,
-          worktreeBranchName: buildTemporaryWorktreeBranchName(randomHex),
+          worktreeBranchName: buildTemporaryWorktreeBranchName(randomHex, {
+            omitPrefix:
+              serverConfigs.get(input.project.environmentId)?.settings.omitT3CodeBranchPrefix ===
+              true,
+          }),
         }),
       });
       if (AsyncResult.isFailure(result)) {
@@ -148,6 +154,6 @@ export function useCreateProjectThread() {
         scopeThreadRef(input.project.environmentId, threadId),
       );
     },
-    [startTurn],
+    [serverConfigs, startTurn],
   );
 }

@@ -36,6 +36,7 @@ T3 Code works with the platforms your team already uses:
 - T3 Code can suggest titles and descriptions based on your commits
 - With **Repository conventions** selected, generated source control text follows the project's
   `AGENTS.md` along with recent commit subjects. Claude writers also follow `CLAUDE.md`
+- New worktree branches and pull-request checkout branches are named `t3code/…` unless **Settings → General → Omit t3code/ from branch names** is on. That setting does not rename existing branches.
 - Supports GitHub Pull Requests, GitLab Merge Requests, Bitbucket Pull Requests, Azure DevOps Pull Requests, and Forgejo / Gitea Pull Requests
 
 **Stay on top of open reviews**

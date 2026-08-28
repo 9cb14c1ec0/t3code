@@ -11,6 +11,7 @@ import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstab
 import * as ForgejoApi from "./ForgejoApi.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import * as VcsDriverRegistry from "../vcs/VcsDriverRegistry.ts";
+import { ServerSettingsService } from "../serverSettings.ts";
 import type * as VcsDriver from "../vcs/VcsDriver.ts";
 
 const forgejoPullRequest = {
@@ -141,6 +142,7 @@ function makeLayer(input: {
           ConfigProvider.fromEnv({ env: { T3CODE_FORGEJO_KEYS_PATH: keysPath } }),
         ),
       ),
+      Layer.provide(ServerSettingsService.layerTest()),
       Layer.provideMerge(NodeServices.layer),
     );
   });
