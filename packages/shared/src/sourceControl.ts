@@ -1,7 +1,14 @@
 import type { SourceControlProviderInfo, SourceControlProviderKind } from "@t3tools/contracts";
 
 export interface ChangeRequestPresentation {
-  readonly icon: "github" | "gitlab" | "azure-devops" | "bitbucket" | "forgejo" | "change-request";
+  readonly icon:
+    | "github"
+    | "gitlab"
+    | "azure-devops"
+    | "bitbucket"
+    | "forgejo"
+    | "gitea"
+    | "change-request";
   readonly providerName: string;
   readonly shortName: string;
   readonly longName: string;
@@ -75,6 +82,17 @@ const FORGEJO_CHANGE_REQUEST_PRESENTATION: ChangeRequestPresentation = {
   urlExample: "https://codeberg.org/owner/repo/pulls/42",
 };
 
+const GITEA_CHANGE_REQUEST_PRESENTATION: ChangeRequestPresentation = {
+  icon: "gitea",
+  providerName: "Gitea",
+  shortName: "PR",
+  longName: "pull request",
+  pluralLongName: "pull requests",
+  providerLongName: "Gitea pull request",
+  checkoutCommandExample: "tea pr 123",
+  urlExample: "https://gitea.com/owner/repo/pulls/42",
+};
+
 const GENERIC_CHANGE_REQUEST_PRESENTATION: ChangeRequestPresentation = {
   icon: "change-request",
   providerName: "source control",
@@ -100,6 +118,8 @@ export function resolveChangeRequestPresentation(
       return BITBUCKET_CHANGE_REQUEST_PRESENTATION;
     case "forgejo":
       return FORGEJO_CHANGE_REQUEST_PRESENTATION;
+    case "gitea":
+      return GITEA_CHANGE_REQUEST_PRESENTATION;
     case "unknown":
       return GENERIC_CHANGE_REQUEST_PRESENTATION;
   }
@@ -212,23 +232,21 @@ function isBitbucketHost(host: string): boolean {
 }
 
 function isForgejoHost(host: string): boolean {
-  return (
-    host === "codeberg.org" ||
-    host === "gitea.com" ||
-    hasDnsLabel(host, "forgejo") ||
-    hasDnsLabel(host, "codeberg") ||
-    hasDnsLabel(host, "gitea")
-  );
+  return host === "codeberg.org" || hasDnsLabel(host, "forgejo") || hasDnsLabel(host, "codeberg");
+}
+
+function isGiteaHost(host: string): boolean {
+  return host === "gitea.com" || hasDnsLabel(host, "gitea");
 }
 
 function forgejoProviderName(hostname: string): string {
-  if (hostname === "codeberg.org" || hasDnsLabel(hostname, "codeberg")) {
-    return hostname === "codeberg.org" ? "Codeberg" : "Codeberg Self-Hosted";
-  }
-  if (hostname === "gitea.com" || hasDnsLabel(hostname, "gitea")) {
-    return hostname === "gitea.com" ? "Gitea" : "Gitea Self-Hosted";
-  }
+  if (hostname === "codeberg.org") return "Codeberg";
+  if (hasDnsLabel(hostname, "codeberg")) return "Codeberg Self-Hosted";
   return "Forgejo";
+}
+
+function giteaProviderName(hostname: string): string {
+  return hostname === "gitea.com" ? "Gitea" : "Gitea Self-Hosted";
 }
 
 export function detectSourceControlProviderFromRemoteUrl(
@@ -276,6 +294,14 @@ export function detectSourceControlProviderFromRemoteUrl(
     return {
       kind: "forgejo",
       name: forgejoProviderName(hostname),
+      baseUrl: toBaseUrl(host),
+    };
+  }
+
+  if (isGiteaHost(hostname)) {
+    return {
+      kind: "gitea",
+      name: giteaProviderName(hostname),
       baseUrl: toBaseUrl(host),
     };
   }

@@ -192,6 +192,15 @@ export const BitbucketIcon: Icon = (props) => {
   );
 };
 
+export const GiteaIcon: Icon = (props) => (
+  <svg {...props} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path
+      fill="#609926"
+      d="M2.4 7.2h9.2c.6 0 1.1.5 1.1 1.1v.3c.8.3 1.3 1 1.3 1.8 0 1.1-.9 2-2 2H4.4c-1.3 0-2.4-1.1-2.4-2.4V7.2Zm1.4-2.2c0-1.9 1.5-3.4 3.4-3.4.6 0 1.2.2 1.7.5l.3.2.3-.2c.5-.3 1.1-.5 1.7-.5 1.9 0 3.4 1.5 3.4 3.4v1.4H3.8V5Z"
+    />
+  </svg>
+);
+
 export const ForgejoIcon: Icon = (props) => (
   <svg {...props} viewBox="0 0 212 212" fill="none" xmlns="http://www.w3.org/2000/svg">
     <g transform="translate(6,6)">

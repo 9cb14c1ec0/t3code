@@ -42,6 +42,7 @@ import * as CheckpointStore from "./checkpointing/CheckpointStore.ts";
 import * as AzureDevOpsCli from "./sourceControl/AzureDevOpsCli.ts";
 import * as BitbucketApi from "./sourceControl/BitbucketApi.ts";
 import * as ForgejoApi from "./sourceControl/ForgejoApi.ts";
+import * as GiteaApi from "./sourceControl/GiteaApi.ts";
 import * as GitHubCli from "./sourceControl/GitHubCli.ts";
 import * as GitLabCli from "./sourceControl/GitLabCli.ts";
 import * as TextGeneration from "./textGeneration/TextGeneration.ts";
@@ -282,6 +283,7 @@ const SourceControlProviderRegistryLayerLive = SourceControlProviderRegistry.lay
       AzureDevOpsCli.layer,
       BitbucketApi.layer,
       ForgejoApi.layer,
+      GiteaApi.layer,
       GitHubCli.layer,
       GitLabCli.layer,
     ),
