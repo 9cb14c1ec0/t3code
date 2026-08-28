@@ -277,11 +277,17 @@ const make = Effect.gen(function* () {
                   settings,
                   yield* providerRegistry.getProviders,
                 );
+          // The fork setting skips the default t3code/ prefix. A custom prefix
+          // still applies, because that choice is more specific than the toggle.
+          const prefix =
+            settings.omitT3CodeBranchPrefix && settings.branchNamePrefix === "t3code"
+              ? ""
+              : settings.branchNamePrefix;
           return yield* textGeneration
             .generateBranchName({
               naming: {
                 mode: settings.branchNamingMode,
-                prefix: settings.branchNamePrefix,
+                prefix,
                 instructions: settings.branchNameInstructions,
               },
               cwd,
@@ -299,13 +305,20 @@ const make = Effect.gen(function* () {
         });
 
       // The server owns worktree naming: without an explicit branch, provision
-      // under a temporary `t3code/<hash>` name so the worktree never waits on
-      // name generation, then rename in the background below.
+      // under a temporary name so the worktree never waits on name generation,
+      // then rename in the background below. The default is `t3code/<hash>`;
+      // omitT3CodeBranchPrefix leaves the hash bare.
       const requestedBranch = input.workspaceStrategy.branch;
       let branch: string | null;
       if (input.workspaceStrategy.type === "worktree" && requestedBranch === undefined) {
+        const settings = resolveProjectSettings(
+          yield* serverSettings.getSettings,
+          input.projectId,
+        ).settings;
         const uuid = yield* randomUuidV4;
-        branch = buildTemporaryWorktreeBranchName(() => uuid.replaceAll("-", ""));
+        branch = buildTemporaryWorktreeBranchName(() => uuid.replaceAll("-", ""), {
+          omitPrefix: settings.omitT3CodeBranchPrefix,
+        });
       } else {
         branch = requestedBranch ?? null;
       }
