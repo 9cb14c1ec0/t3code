@@ -639,6 +639,9 @@ export function useSettingsRestore(onRestored?: () => void) {
       DEFAULT_UNIFIED_SETTINGS.newWorktreesStartFromOrigin
         ? ["New worktrees start from origin"]
         : []),
+      ...(settings.omitT3CodeBranchPrefix !== DEFAULT_UNIFIED_SETTINGS.omitT3CodeBranchPrefix
+        ? ["Omit t3code/ from branch names"]
+        : []),
       ...(settings.addProjectBaseDirectory !== DEFAULT_UNIFIED_SETTINGS.addProjectBaseDirectory
         ? ["Add project base directory"]
         : []),
@@ -685,6 +688,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       settings.defaultThreadEnvMode,
       settings.newWorktreesStartFromOrigin,
       settings.diffFilesCollapsed,
+      settings.omitT3CodeBranchPrefix,
       settings.diffIgnoreWhitespace,
       settings.diffLayout,
       settings.proactivePanelsEnabled,
@@ -824,6 +828,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       providerHealthRefreshInterval: DEFAULT_UNIFIED_SETTINGS.providerHealthRefreshInterval,
       defaultThreadEnvMode: DEFAULT_UNIFIED_SETTINGS.defaultThreadEnvMode,
       newWorktreesStartFromOrigin: DEFAULT_UNIFIED_SETTINGS.newWorktreesStartFromOrigin,
+      omitT3CodeBranchPrefix: DEFAULT_UNIFIED_SETTINGS.omitT3CodeBranchPrefix,
       addProjectBaseDirectory: DEFAULT_UNIFIED_SETTINGS.addProjectBaseDirectory,
       confirmThreadArchive: DEFAULT_UNIFIED_SETTINGS.confirmThreadArchive,
       confirmThreadDelete: DEFAULT_UNIFIED_SETTINGS.confirmThreadDelete,
@@ -3071,6 +3076,34 @@ export function GeneralSettingsPanel() {
             />
           }
         />
+        <SettingsRow
+          serverScoped
+          settingKeys={["omitT3CodeBranchPrefix"]}
+          {...searchableSetting("omit-t3code-branch-prefix")}
+          description="New worktree branches skip the t3/ prefix, and pull-request checkout branches skip the t3code/ prefix. A custom branch prefix still applies. Existing branches keep their names."
+          resetAction={
+            settings.omitT3CodeBranchPrefix !== DEFAULT_UNIFIED_SETTINGS.omitT3CodeBranchPrefix ? (
+              <SettingResetButton
+                label="omit t3code/ from branch names"
+                onClick={() =>
+                  updateSettings({
+                    omitT3CodeBranchPrefix: DEFAULT_UNIFIED_SETTINGS.omitT3CodeBranchPrefix,
+                  })
+                }
+              />
+            ) : null
+          }
+          control={
+            <Switch
+              checked={settings.omitT3CodeBranchPrefix}
+              onCheckedChange={(checked) =>
+                updateSettings({ omitT3CodeBranchPrefix: Boolean(checked) })
+              }
+              aria-label="Omit t3code/ from new branch names"
+            />
+          }
+        />
+
         <SettingsRow
           serverScoped
           settingKeys={["addProjectBaseDirectory"]}
