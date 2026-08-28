@@ -37,8 +37,8 @@ import {
   mergeGitStatusParts,
   normalizeGitRemoteUrl,
   resolveAutoFeatureBranchName,
-  sanitizeBranchFragment,
   sanitizeFeatureBranchName,
+  buildPullRequestCheckoutBranchName,
 } from "@t3tools/shared/git";
 import {
   getChangeRequestTerminologyForKind,
@@ -216,14 +216,14 @@ function resolveHeadRepositoryNameWithOwner(
 
 function resolvePullRequestWorktreeLocalBranchName(
   pullRequest: ResolvedPullRequest & PullRequestHeadRemoteInfo,
+  omitPrefix: boolean,
 ): string {
-  if (!pullRequest.isCrossRepository) {
-    return pullRequest.headBranch;
-  }
-
-  const sanitizedHeadBranch = sanitizeBranchFragment(pullRequest.headBranch).trim();
-  const suffix = sanitizedHeadBranch.length > 0 ? sanitizedHeadBranch : "head";
-  return `t3code/pr-${pullRequest.number}/${suffix}`;
+  return buildPullRequestCheckoutBranchName({
+    pullRequestId: pullRequest.number,
+    headBranch: pullRequest.headBranch,
+    isCrossRepository: pullRequest.isCrossRepository,
+    omitPrefix,
+  });
 }
 
 function parseGitHubRepositoryNameWithOwnerFromRemoteUrl(url: string | null): string | null {
@@ -1973,8 +1973,12 @@ export const make = Effect.gen(function* () {
         ...pullRequest,
         ...toPullRequestHeadRemoteInfo(pullRequestSummary),
       } as const;
-      const localPullRequestBranch =
-        resolvePullRequestWorktreeLocalBranchName(pullRequestWithRemoteInfo);
+      const omitT3CodeBranchPrefix = (yield* serverSettingsService.getSettings)
+        .omitT3CodeBranchPrefix;
+      const localPullRequestBranch = resolvePullRequestWorktreeLocalBranchName(
+        pullRequestWithRemoteInfo,
+        omitT3CodeBranchPrefix,
+      );
 
       // Git refuses to move a branch that is checked out in a worktree, so the
       // reuse paths cannot go through materializePullRequestHeadBranch and instead
