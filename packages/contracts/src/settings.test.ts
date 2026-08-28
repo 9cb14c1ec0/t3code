@@ -199,6 +199,15 @@ describe("ServerSettings worktree defaults", () => {
       encode(decodeServerSettings({ defaultThreadEnvMode: "worktree" })).defaultThreadEnvMode,
     ).toBe("worktree");
   });
+  it("defaults omit-t3code-branch-prefix off for legacy configs", () => {
+    expect(decodeServerSettings({}).omitT3CodeBranchPrefix).toBe(false);
+  });
+
+  it("accepts omit-t3code-branch-prefix updates", () => {
+    expect(decodeServerSettingsPatch({ omitT3CodeBranchPrefix: true }).omitT3CodeBranchPrefix).toBe(
+      true,
+    );
+  });
 });
 
 describe("ServerSettings.sourceControlWritingStyle", () => {
