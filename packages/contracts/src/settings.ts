@@ -1333,6 +1333,8 @@ export const ServerSettings = Schema.Struct({
   worktreeSubmodules: ForwardCompatibleNullable(WorktreeSubmodules).pipe(
     Schema.withDecodingDefault(Effect.succeed(null)),
   ),
+  // Fork: skip the `t3code/` prefix on new worktree and PR checkout branches.
+  omitT3CodeBranchPrefix: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   addProjectBaseDirectory: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
   textGenerationModelSelection: ModelSelection.pipe(
     Schema.withDecodingDefault(
@@ -1646,6 +1648,7 @@ export const ServerSettingsPatch = Schema.Struct({
   defaultThreadEnvMode: Schema.optionalKey(Schema.NullOr(ThreadEnvMode)),
   newWorktreesStartFromOrigin: Schema.optionalKey(Schema.Boolean),
   worktreeSubmodules: Schema.optionalKey(Schema.NullOr(WorktreeSubmodules)),
+  omitT3CodeBranchPrefix: Schema.optionalKey(Schema.Boolean),
   addProjectBaseDirectory: Schema.optionalKey(TrimmedString),
   textGenerationModelSelection: Schema.optionalKey(ModelSelectionPatch),
   branchNamingMode: Schema.optionalKey(BranchNamingMode),
