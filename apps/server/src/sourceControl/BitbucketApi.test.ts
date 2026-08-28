@@ -18,6 +18,7 @@ import { GitCommandError } from "@t3tools/contracts";
 import * as BitbucketApi from "./BitbucketApi.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import * as VcsDriverRegistry from "../vcs/VcsDriverRegistry.ts";
+import { ServerSettingsService } from "../serverSettings.ts";
 import type * as VcsDriver from "../vcs/VcsDriver.ts";
 
 const bitbucketPullRequest = {
@@ -158,6 +159,7 @@ function makeLayer(input: {
         }),
       ),
     ),
+    Layer.provide(ServerSettingsService.layerTest()),
     Layer.provideMerge(NodeServices.layer),
   );
 
