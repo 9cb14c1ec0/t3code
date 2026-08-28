@@ -1132,6 +1132,34 @@ it.effect("names the worktree itself when the client provides no branch", () =>
   }),
 );
 
+it.effect(
+  "omits the default prefix from a server-named temporary branch when the setting is on",
+  () =>
+    Effect.gen(function* () {
+      const harness = makeHarness({
+        serverSettings: { omitT3CodeBranchPrefix: true },
+        hasCommit: (input) => Effect.succeed(input.refName === "refs/heads/t3"),
+      });
+      yield* Effect.gen(function* () {
+        const launches = yield* ThreadLaunch.ThreadLaunchService;
+        yield* launches.launch(
+          launchInput({
+            command: "command:launch:omit-prefix",
+            thread: "thread:launch:omit-prefix",
+            message: "Build the feature",
+            workspace: { type: "worktree", baseRef: "main" },
+          }),
+        );
+        yield* waitUntil(() => Effect.sync(() => harness.createWorktree.mock.calls.length === 1));
+        assert.match(harness.createWorktree.mock.calls[0]?.[0]?.newRefName ?? "", /^[0-9a-f]{8}$/u);
+        yield* waitUntil(() =>
+          Effect.sync(() => harness.generateBranchName.mock.calls.length === 1),
+        );
+        assert.equal(harness.generateBranchName.mock.calls[0]?.[0]?.naming?.prefix, "");
+      }).pipe(Effect.provide(harness.layer));
+    }),
+);
+
 it.effect("renames a temporary t3/<hash> branch off the provisioning critical path", () =>
   Effect.gen(function* () {
     const branchNameStarted = yield* Deferred.make<void>();
