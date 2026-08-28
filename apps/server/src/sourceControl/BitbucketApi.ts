@@ -1042,7 +1042,16 @@ export const make = Effect.gen(function* () {
           ...(input.context ? { context: input.context } : {}),
         });
         const remoteBranch = pullRequest.source.branch.name;
-        const omitPrefix = (yield* serverSettingsService.getSettings).omitT3CodeBranchPrefix;
+        const omitPrefix = (yield* serverSettingsService.getSettings.pipe(
+          Effect.mapError(
+            (cause) =>
+              new BitbucketCheckoutError({
+                cwd: input.cwd,
+                reference: input.reference,
+                cause,
+              }),
+          ),
+        )).omitT3CodeBranchPrefix;
         const localBranch = buildPullRequestCheckoutBranchName({
           pullRequestId: pullRequest.id,
           headBranch: remoteBranch,

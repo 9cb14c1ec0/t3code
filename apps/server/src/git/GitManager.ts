@@ -221,7 +221,7 @@ function resolvePullRequestWorktreeLocalBranchName(
   return buildPullRequestCheckoutBranchName({
     pullRequestId: pullRequest.number,
     headBranch: pullRequest.headBranch,
-    isCrossRepository: pullRequest.isCrossRepository,
+    isCrossRepository: pullRequest.isCrossRepository === true,
     omitPrefix,
   });
 }
@@ -1973,8 +1973,17 @@ export const make = Effect.gen(function* () {
         ...pullRequest,
         ...toPullRequestHeadRemoteInfo(pullRequestSummary),
       } as const;
-      const omitT3CodeBranchPrefix = (yield* serverSettingsService.getSettings)
-        .omitT3CodeBranchPrefix;
+      const omitT3CodeBranchPrefix = (yield* serverSettingsService.getSettings.pipe(
+        Effect.mapError(
+          (cause) =>
+            new GitManagerError({
+              operation: "preparePullRequestThread",
+              cwd: input.cwd,
+              detail: "Failed to get server settings.",
+              cause,
+            }),
+        ),
+      )).omitT3CodeBranchPrefix;
       const localPullRequestBranch = resolvePullRequestWorktreeLocalBranchName(
         pullRequestWithRemoteInfo,
         omitT3CodeBranchPrefix,
