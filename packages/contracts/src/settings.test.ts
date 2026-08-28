@@ -322,6 +322,16 @@ describe("ServerSettings worktree defaults", () => {
       decodeServerSettingsPatch({ newWorktreesStartFromOrigin: false }).newWorktreesStartFromOrigin,
     ).toBe(false);
   });
+
+  it("defaults omit-t3code-branch-prefix off for legacy configs", () => {
+    expect(decodeServerSettings({}).omitT3CodeBranchPrefix).toBe(false);
+  });
+
+  it("accepts omit-t3code-branch-prefix updates", () => {
+    expect(decodeServerSettingsPatch({ omitT3CodeBranchPrefix: true }).omitT3CodeBranchPrefix).toBe(
+      true,
+    );
+  });
 });
 
 describe("ServerSettings.sourceControlWritingStyle", () => {
