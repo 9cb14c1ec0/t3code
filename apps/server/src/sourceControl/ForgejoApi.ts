@@ -9,7 +9,7 @@ import {
   type SourceControlRepositoryVisibility,
 } from "@t3tools/contracts";
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http";
-import { sanitizeBranchFragment } from "@t3tools/shared/git";
+import { buildPullRequestCheckoutBranchName } from "@t3tools/shared/git";
 import { detectSourceControlProviderFromRemoteUrl } from "@t3tools/shared/sourceControl";
 
 import * as ForgejoKeyStore from "./ForgejoKeyStore.ts";
@@ -17,6 +17,7 @@ import * as ForgejoPullRequests from "./forgejoPullRequests.ts";
 import * as SourceControlProvider from "./SourceControlProvider.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import * as VcsDriverRegistry from "../vcs/VcsDriverRegistry.ts";
+import * as ServerSettings from "../serverSettings.ts";
 
 export class ForgejoApiError extends Schema.TaggedErrorClass<ForgejoApiError>()("ForgejoApiError", {
   operation: Schema.String,
@@ -196,15 +197,6 @@ function shouldPreferSshRemote(originRemoteUrl: string | null): boolean {
   return trimmed.startsWith("git@") || trimmed.startsWith("ssh://");
 }
 
-function checkoutBranchName(input: {
-  readonly pullRequestId: number;
-  readonly headBranch: string;
-  readonly isCrossRepository: boolean;
-}): string {
-  if (!input.isCrossRepository) return input.headBranch;
-  return `t3code/pr-${input.pullRequestId}/${sanitizeBranchFragment(input.headBranch)}`;
-}
-
 function requestError(operation: string, cause: unknown): ForgejoApiError {
   return new ForgejoApiError({
     operation,
@@ -244,6 +236,7 @@ export const make = Effect.gen(function* () {
   const keyStore = yield* ForgejoKeyStore.ForgejoKeyStore;
   const git = yield* GitVcsDriver.GitVcsDriver;
   const vcsRegistry = yield* VcsDriverRegistry.VcsDriverRegistry;
+  const serverSettingsService = yield* ServerSettings.ServerSettingsService;
 
   const apiUrl = (locator: Pick<ForgejoRepositoryLocator, "host" | "scheme">, path: string) =>
     `${locator.scheme}://${locator.host}/api/v1${path}`;
@@ -579,10 +572,12 @@ export const make = Effect.gen(function* () {
           });
         }
 
-        const localBranch = checkoutBranchName({
+        const omitPrefix = (yield* serverSettingsService.getSettings).omitT3CodeBranchPrefix;
+        const localBranch = buildPullRequestCheckoutBranchName({
           pullRequestId: pullRequest.number,
           headBranch: remoteBranch,
           isCrossRepository,
+          omitPrefix,
         });
         const localBranchExists = (yield* git.listLocalBranchNames(input.cwd)).includes(
           localBranch,

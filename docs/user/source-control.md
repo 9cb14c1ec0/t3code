@@ -34,6 +34,7 @@ T3 Code works with the platforms your team already uses:
 
 - Push a branch and create a pull request from the Git actions controls in the toolbar
 - T3 Code can suggest titles and descriptions based on your commits
+- New worktree branches and pull-request checkout branches are named `t3code/…` unless **Settings → General → Omit t3code/ from branch names** is on. That setting does not rename existing branches.
 - Supports GitHub Pull Requests, GitLab Merge Requests, Bitbucket Pull Requests, Azure DevOps Pull Requests, and Forgejo / Gitea Pull Requests
 
 **Stay on top of open reviews**

@@ -14,7 +14,7 @@ import {
   type SourceControlRepositoryVisibility,
 } from "@t3tools/contracts";
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http";
-import { sanitizeBranchFragment } from "@t3tools/shared/git";
+import { buildPullRequestCheckoutBranchName } from "@t3tools/shared/git";
 import {
   detectSourceControlProviderFromRemoteUrl,
   isSshRemoteUrl,
@@ -30,6 +30,7 @@ import { collectUint8StreamText } from "../stream/collectUint8StreamText.ts";
 import * as SourceControlProvider from "./SourceControlProvider.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import * as VcsDriverRegistry from "../vcs/VcsDriverRegistry.ts";
+import * as ServerSettings from "../serverSettings.ts";
 import { retryAtFromHeader } from "./SourceControlRateLimit.ts";
 
 const DEFAULT_API_BASE_URL = "https://api.bitbucket.org/2.0";
@@ -513,18 +514,6 @@ function selectCloneUrl(input: {
     : input.cloneUrls.url;
 }
 
-function checkoutBranchName(input: {
-  readonly pullRequestId: number;
-  readonly headBranch: string;
-  readonly isCrossRepository: boolean;
-}): string {
-  if (!input.isCrossRepository) {
-    return input.headBranch;
-  }
-
-  return `t3code/pr-${input.pullRequestId}/${sanitizeBranchFragment(input.headBranch)}`;
-}
-
 function repositoryNameWithOwner(
   repository: Schema.Schema.Type<typeof BitbucketPullRequestSchema>["source"]["repository"],
 ): string | null {
@@ -612,6 +601,7 @@ export const make = Effect.gen(function* () {
   const fileSystem = yield* FileSystem.FileSystem;
   const git = yield* GitVcsDriver.GitVcsDriver;
   const vcsRegistry = yield* VcsDriverRegistry.VcsDriverRegistry;
+  const serverSettingsService = yield* ServerSettings.ServerSettingsService;
 
   const apiUrl = (path: string) => `${config.baseUrl.replace(/\/+$/u, "")}${path}`;
 
@@ -1052,10 +1042,12 @@ export const make = Effect.gen(function* () {
           ...(input.context ? { context: input.context } : {}),
         });
         const remoteBranch = pullRequest.source.branch.name;
-        const localBranch = checkoutBranchName({
+        const omitPrefix = (yield* serverSettingsService.getSettings).omitT3CodeBranchPrefix;
+        const localBranch = buildPullRequestCheckoutBranchName({
           pullRequestId: pullRequest.id,
           headBranch: remoteBranch,
           isCrossRepository,
+          omitPrefix,
         });
         const localBranchNames = yield* git.listLocalBranchNames(input.cwd);
         const localBranchExists = localBranchNames.includes(localBranch);
