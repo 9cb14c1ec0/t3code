@@ -5209,6 +5209,58 @@ it.layer(GitManagerTestLayer)("GitManager", (it) => {
       }),
   );
 
+  it.effect("omits t3code/ from fork PR checkout branches when the setting is on", () =>
+    Effect.gen(function* () {
+      const repoDir = yield* makeTempDir("t3code-git-manager-");
+      yield* initRepo(repoDir);
+      const originDir = yield* createBareRemote();
+      const forkDir = yield* createBareRemote();
+      yield* runGit(repoDir, ["remote", "add", "origin", originDir]);
+      yield* runGit(repoDir, ["push", "-u", "origin", "main"]);
+      yield* runGit(repoDir, ["remote", "add", "fork-seed", forkDir]);
+      yield* runGit(repoDir, ["checkout", "-b", "fork-main-source"]);
+      NodeFS.writeFileSync(NodePath.join(repoDir, "fork-main.txt"), "fork main\n");
+      yield* runGit(repoDir, ["add", "fork-main.txt"]);
+      yield* runGit(repoDir, ["commit", "-m", "Fork main branch"]);
+      yield* runGit(repoDir, ["push", "-u", "fork-seed", "fork-main-source:main"]);
+      yield* runGit(repoDir, ["checkout", "main"]);
+
+      const { manager } = yield* makeManager({
+        serverSettings: { omitT3CodeBranchPrefix: true },
+        ghScenario: {
+          pullRequest: {
+            number: 91,
+            title: "Fork main PR",
+            url: "https://github.com/pingdotgg/codething-mvp/pull/91",
+            baseRefName: "main",
+            headRefName: "main",
+            state: "open",
+            isCrossRepository: true,
+            headRepositoryNameWithOwner: "octocat/codething-mvp",
+            headRepositoryOwnerLogin: "octocat",
+          },
+          repositoryCloneUrls: {
+            "octocat/codething-mvp": {
+              url: forkDir,
+              sshUrl: forkDir,
+            },
+          },
+        },
+      });
+
+      const result = yield* preparePullRequestThread(manager, {
+        cwd: repoDir,
+        reference: "91",
+        mode: "worktree",
+      });
+
+      expect(result.branch).toBe("pr-91/main");
+      expect(
+        (yield* runGit(result.worktreePath as string, ["branch", "--show-current"])).stdout.trim(),
+      ).toBe("pr-91/main");
+    }),
+  );
+
   it.effect(
     "does not overwrite an existing local main branch when preparing a fork PR worktree",
     () =>
