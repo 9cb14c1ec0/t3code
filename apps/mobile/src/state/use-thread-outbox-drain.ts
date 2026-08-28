@@ -1043,7 +1043,11 @@ export function useThreadOutboxDrain(): void {
           branch: workspace.branch,
           worktreePath: workspace.worktreePath,
           startFromOrigin: workspace.startFromOrigin ?? false,
-          worktreeBranchName: buildTemporaryWorktreeBranchName(randomHex),
+          worktreeBranchName: buildTemporaryWorktreeBranchName(randomHex, {
+            omitPrefix:
+              serverConfigs.get(queuedMessage.environmentId)?.settings?.omitT3CodeBranchPrefix ===
+              true,
+          }),
         }),
       });
       if (AsyncResult.isFailure(deliveryResult) && !hasAccess()) return true;
