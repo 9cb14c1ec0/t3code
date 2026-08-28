@@ -16,7 +16,7 @@ import {
   type SourceControlRepositoryVisibility,
 } from "@t3tools/contracts";
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
-import { sanitizeBranchFragment } from "@t3tools/shared/git";
+import { buildPullRequestCheckoutBranchName } from "@t3tools/shared/git";
 import {
   detectSourceControlProviderFromRemoteUrl,
   isSshRemoteUrl,
@@ -517,18 +517,6 @@ function selectCloneUrl(input: {
   return shouldPreferSshRemote(input.originRemoteUrl)
     ? input.cloneUrls.sshUrl
     : input.cloneUrls.url;
-}
-
-function checkoutBranchName(input: {
-  readonly pullRequestId: number;
-  readonly headBranch: string;
-  readonly isCrossRepository: boolean;
-}): string {
-  if (!input.isCrossRepository) {
-    return input.headBranch;
-  }
-
-  return `t3code/pr-${input.pullRequestId}/${sanitizeBranchFragment(input.headBranch)}`;
 }
 
 function repositoryNameWithOwner(
@@ -1116,10 +1104,21 @@ export const make = Effect.gen(function* () {
           ...(input.context ? { context: input.context } : {}),
         });
         const remoteBranch = pullRequest.source.branch.name;
-        const localBranch = checkoutBranchName({
+        const omitPrefix = (yield* serverSettings.getSettings.pipe(
+          Effect.mapError(
+            (cause) =>
+              new BitbucketCheckoutError({
+                cwd: input.cwd,
+                reference: input.reference,
+                cause,
+              }),
+          ),
+        )).omitT3CodeBranchPrefix;
+        const localBranch = buildPullRequestCheckoutBranchName({
           pullRequestId: pullRequest.id,
           headBranch: remoteBranch,
           isCrossRepository,
+          omitPrefix,
         });
         const localBranchNames = yield* git.listLocalBranchNames(input.cwd);
         const localBranchExists = localBranchNames.includes(localBranch);

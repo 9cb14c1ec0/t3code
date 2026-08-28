@@ -282,11 +282,20 @@ const make = Effect.gen(function* () {
                   settings,
                   yield* providerRegistry.getProviders,
                 );
+          // The fork setting skips the default prefix. A custom prefix still
+          // applies, because that choice is more specific than the toggle.
+          // `t3` is the current default; `t3code` is the legacy one.
+          const prefix =
+            settings.omitT3CodeBranchPrefix &&
+            (settings.branchNamePrefix === WORKTREE_BRANCH_PREFIX ||
+              settings.branchNamePrefix === "t3code")
+              ? ""
+              : settings.branchNamePrefix;
           return yield* textGeneration
             .generateBranchName({
               naming: {
                 mode: settings.branchNamingMode,
-                prefix: settings.branchNamePrefix,
+                prefix,
                 instructions: settings.branchNameInstructions,
               },
               cwd,
@@ -306,11 +315,18 @@ const make = Effect.gen(function* () {
       // The server owns worktree naming: without an explicit branch, provision
       // under a temporary `t3/<hash>` name so the worktree never waits on
       // name generation, then rename in the background below.
+      // omitT3CodeBranchPrefix leaves the hash bare.
       const requestedBranch = input.workspaceStrategy.branch;
       let branch: string | null;
       if (input.workspaceStrategy.type === "worktree" && requestedBranch === undefined) {
+        const settings = resolveProjectSettings(
+          yield* serverSettings.getSettings,
+          input.projectId,
+        ).settings;
         const uuid = yield* randomUuidV4;
-        branch = buildTemporaryWorktreeBranchName(() => uuid.replaceAll("-", ""));
+        branch = buildTemporaryWorktreeBranchName(() => uuid.replaceAll("-", ""), {
+          omitPrefix: settings.omitT3CodeBranchPrefix,
+        });
       } else {
         branch = requestedBranch ?? null;
       }
@@ -368,8 +384,16 @@ const make = Effect.gen(function* () {
           }
         }
         if (startFromOrigin) yield* setupTracker.stageStatus(threadId, "fetch", "done");
+        const normalizedBranch = branch?.trim().toLowerCase() ?? "";
+        // A plain `t3` branch blocks `t3/*` refs. Bare omit-prefix names do not
+        // use that namespace, so they stay bare instead of becoming `t3-<hex>`.
+        const temporaryNameUsesPrefixedRef =
+          normalizedBranch.startsWith(`${WORKTREE_BRANCH_PREFIX}/`) ||
+          normalizedBranch.startsWith("t3code/") ||
+          normalizedBranch.startsWith("t3code-");
         if (
           branch !== null &&
+          temporaryNameUsesPrefixedRef &&
           isTemporaryWorktreeBranch(branch) &&
           (yield* git
             .hasCommit({
