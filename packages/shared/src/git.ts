@@ -159,7 +159,7 @@ export function buildPullRequestCheckoutBranchName(input: {
   const sanitizedHeadBranch = sanitizeBranchFragment(input.headBranch).trim();
   const suffix = sanitizedHeadBranch.length > 0 ? sanitizedHeadBranch : "head";
   return withWorktreeBranchPrefix(`pr-${input.pullRequestId}/${suffix}`, {
-    omitPrefix: input.omitPrefix,
+    omitPrefix: input.omitPrefix === true,
   });
 }
 
