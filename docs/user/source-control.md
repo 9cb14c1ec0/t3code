@@ -153,6 +153,9 @@ the intended remote with `git branch --set-upstream-to=<remote>/<branch>`.
 Choose the writing style and model in **Settings → Source Control**. **Repository conventions**
 uses the project's instructions and recent commit subjects.
 
+New worktree branches are named `t3/…`. Cross-repository pull-request checkout branches are named `t3code/…`. **Settings →
+Projects & threads → Omit t3code/ from branch names** skips those prefixes. A custom branch prefix still applies, and existing branches keep their names.
+
 ## Review and merge
 
 Open **Pull requests** to review changes and comments, request reviewers, check out a branch,
