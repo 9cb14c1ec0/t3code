@@ -1040,7 +1040,9 @@ export function createThreadOutboxDelivery(): {
         branch: workspace.branch,
         worktreePath: workspace.worktreePath,
         startFromOrigin: workspace.startFromOrigin ?? false,
-        worktreeBranchName: buildTemporaryWorktreeBranchName(randomHex),
+        worktreeBranchName: buildTemporaryWorktreeBranchName(randomHex, {
+          omitPrefix: currentConfig.settings?.omitT3CodeBranchPrefix === true,
+        }),
       }),
     });
     if (AsyncResult.isFailure(deliveryResult) && !hasAccess()) return true;

@@ -50,8 +50,8 @@ import {
 import {
   mergeGitStatusParts,
   resolveAutoFeatureBranchName,
-  sanitizeBranchFragment,
   sanitizeFeatureBranchName,
+  buildPullRequestCheckoutBranchName,
 } from "@t3tools/shared/git";
 import { isSshRemoteUrl } from "@t3tools/shared/sourceControl";
 import {
@@ -256,14 +256,14 @@ function resolveHeadRepositoryNameWithOwner(pullRequest: PullRequestHeadRemoteIn
 
 function resolvePullRequestWorktreeLocalBranchName(
   pullRequest: ResolvedPullRequest & PullRequestHeadRemoteInfo,
+  omitPrefix: boolean,
 ): string {
-  if (!pullRequest.isCrossRepository) {
-    return pullRequest.headBranch;
-  }
-
-  const sanitizedHeadBranch = sanitizeBranchFragment(pullRequest.headBranch).trim();
-  const suffix = sanitizedHeadBranch.length > 0 ? sanitizedHeadBranch : "head";
-  return `t3code/pr-${pullRequest.number}/${suffix}`;
+  return buildPullRequestCheckoutBranchName({
+    pullRequestId: pullRequest.number,
+    headBranch: pullRequest.headBranch,
+    isCrossRepository: pullRequest.isCrossRepository === true,
+    omitPrefix,
+  });
 }
 
 export function parseRepositoryNameWithOwnerFromRemoteUrl(
@@ -2780,8 +2780,21 @@ export const make = Effect.gen(function* () {
         ...pullRequest,
         ...toPullRequestHeadRemoteInfo(pullRequestSummary),
       } as const;
-      const localPullRequestBranch =
-        resolvePullRequestWorktreeLocalBranchName(pullRequestWithRemoteInfo);
+      const omitT3CodeBranchPrefix = (yield* serverSettingsService.getSettings.pipe(
+        Effect.mapError(
+          (cause) =>
+            new GitManagerError({
+              operation: "preparePullRequestThread",
+              cwd: input.cwd,
+              detail: "Failed to get server settings.",
+              cause,
+            }),
+        ),
+      )).omitT3CodeBranchPrefix;
+      const localPullRequestBranch = resolvePullRequestWorktreeLocalBranchName(
+        pullRequestWithRemoteInfo,
+        omitT3CodeBranchPrefix,
+      );
 
       // Git refuses to move checked-out branches; advance reused checkouts from inside their worktree.
       const reuseExistingWorktree = Effect.fn("reuseExistingWorktree")(function* (
