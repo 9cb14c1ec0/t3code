@@ -888,7 +888,11 @@ export function useThreadOutboxDrain(): void {
           branch: creation.branch,
           worktreePath: creation.worktreePath,
           startFromOrigin: creation.startFromOrigin ?? false,
-          worktreeBranchName: buildTemporaryWorktreeBranchName(randomHex),
+          worktreeBranchName: buildTemporaryWorktreeBranchName(randomHex, {
+            omitPrefix:
+              serverConfigs.get(queuedMessage.environmentId)?.settings.omitT3CodeBranchPrefix ===
+              true,
+          }),
         }),
       });
       const { reportFailure } = makeDeliveryHelpers(queuedMessage);

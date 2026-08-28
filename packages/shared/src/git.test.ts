@@ -3,6 +3,8 @@ import { describe, expect, it } from "vite-plus/test";
 
 import {
   applyGitStatusStreamEvent,
+  buildGeneratedWorktreeBranchName,
+  buildPullRequestCheckoutBranchName,
   buildTemporaryWorktreeBranchName,
   isTemporaryWorktreeBranch,
   normalizeGitRemoteUrl,
@@ -107,6 +109,73 @@ describe("isTemporaryWorktreeBranch", () => {
     expect(isTemporaryWorktreeBranch(`${WORKTREE_BRANCH_PREFIX}/feature/demo`)).toBe(false);
     expect(isTemporaryWorktreeBranch("main")).toBe(false);
     expect(isTemporaryWorktreeBranch(`${WORKTREE_BRANCH_PREFIX}/deadbeef-extra`)).toBe(false);
+  });
+
+  it("matches unprefixed temporary tokens used when omitPrefix is on", () => {
+    expect(isTemporaryWorktreeBranch("deadbeef")).toBe(true);
+    expect(isTemporaryWorktreeBranch("f4ae4e0e-f971-4d48-b4f2-9cf0aa54ab12")).toBe(true);
+    expect(isTemporaryWorktreeBranch("feature/demo")).toBe(false);
+  });
+});
+
+describe("buildTemporaryWorktreeBranchName omitPrefix", () => {
+  it("drops the t3code/ prefix when omitPrefix is true", () => {
+    expect(buildTemporaryWorktreeBranchName(() => "DEADBEEF", { omitPrefix: true })).toBe(
+      "deadbeef",
+    );
+  });
+});
+
+describe("buildGeneratedWorktreeBranchName", () => {
+  it("prefixes generated names with t3code/ by default", () => {
+    expect(buildGeneratedWorktreeBranchName("Fix reconnect backoff")).toBe(
+      `${WORKTREE_BRANCH_PREFIX}/fix-reconnect-backoff`,
+    );
+  });
+
+  it("omits the t3code/ prefix when requested", () => {
+    expect(buildGeneratedWorktreeBranchName("Fix reconnect backoff", { omitPrefix: true })).toBe(
+      "fix-reconnect-backoff",
+    );
+  });
+
+  it("does not double-prefix names that already include t3code/", () => {
+    expect(buildGeneratedWorktreeBranchName("t3code/fix-reconnect")).toBe(
+      `${WORKTREE_BRANCH_PREFIX}/fix-reconnect`,
+    );
+  });
+});
+
+describe("buildPullRequestCheckoutBranchName", () => {
+  it("keeps same-repo PR heads on the remote branch name", () => {
+    expect(
+      buildPullRequestCheckoutBranchName({
+        pullRequestId: 91,
+        headBranch: "main",
+        isCrossRepository: false,
+      }),
+    ).toBe("main");
+  });
+
+  it("namespaces cross-repo PR checkouts under t3code/pr- by default", () => {
+    expect(
+      buildPullRequestCheckoutBranchName({
+        pullRequestId: 91,
+        headBranch: "main",
+        isCrossRepository: true,
+      }),
+    ).toBe(`${WORKTREE_BRANCH_PREFIX}/pr-91/main`);
+  });
+
+  it("omits the t3code/ prefix for cross-repo PR checkouts when requested", () => {
+    expect(
+      buildPullRequestCheckoutBranchName({
+        pullRequestId: 91,
+        headBranch: "main",
+        isCrossRepository: true,
+        omitPrefix: true,
+      }),
+    ).toBe("pr-91/main");
   });
 });
 
