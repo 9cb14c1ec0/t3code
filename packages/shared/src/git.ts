@@ -17,13 +17,25 @@ export const WORKTREE_BRANCH_PREFIX = "t3";
 // existing threads stay eligible for branch regeneration: `t3code/<8 hex>` and
 // `t3code-<8 hex>` from before the prefix was shortened, and `t3code/<uuid>` from
 // older mobile builds that used Crypto.randomUUID() (always RFC 4122 v4, so version
-// nibble `4` and variant nibble `[89ab]`). Nothing looser than what was generated.
+// nibble `4` and variant nibble `[89ab]`). A bare 8-hex token or v4 UUID is the
+// omitT3CodeBranchPrefix form. Nothing looser than what was generated.
 const TEMP_WORKTREE_HEX_TOKEN = "[0-9a-f]{8}";
 const TEMP_WORKTREE_UUID_V4_TOKEN =
   "[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
 const TEMP_WORKTREE_BRANCH_PATTERN = new RegExp(
-  `^(?:${WORKTREE_BRANCH_PREFIX}[-/]${TEMP_WORKTREE_HEX_TOKEN}|t3code(?:[-/]${TEMP_WORKTREE_HEX_TOKEN}|\\/${TEMP_WORKTREE_UUID_V4_TOKEN}))$`,
+  `^(?:${WORKTREE_BRANCH_PREFIX}[-/]${TEMP_WORKTREE_HEX_TOKEN}|t3code(?:[-/]${TEMP_WORKTREE_HEX_TOKEN}|/${TEMP_WORKTREE_UUID_V4_TOKEN})|${TEMP_WORKTREE_HEX_TOKEN}|${TEMP_WORKTREE_UUID_V4_TOKEN})$`,
 );
+
+export interface WorktreeBranchNameOptions {
+  readonly omitPrefix?: boolean;
+}
+
+export function withWorktreeBranchPrefix(
+  fragment: string,
+  options?: WorktreeBranchNameOptions,
+): string {
+  return options?.omitPrefix === true ? fragment : `${WORKTREE_BRANCH_PREFIX}/${fragment}`;
+}
 
 /**
  * Sanitize an arbitrary string into a valid, lowercase git refName fragment.
@@ -118,6 +130,7 @@ export function deriveLocalBranchNameFromRemoteRef(branchName: string): string {
 
 export function buildTemporaryWorktreeBranchName(
   randomHex: (byteLength: number) => string,
+  options?: WorktreeBranchNameOptions,
 ): string {
   // Normalize to exactly 8 lowercase hex chars so a UUID-shaped callback
   // still produces the canonical temporary branch form.
@@ -125,7 +138,55 @@ export function buildTemporaryWorktreeBranchName(
     .toLowerCase()
     .replace(/[^0-9a-f]/g, "")
     .slice(0, 8);
-  return `${WORKTREE_BRANCH_PREFIX}/${token}`;
+  return withWorktreeBranchPrefix(token, options);
+}
+
+export function buildGeneratedWorktreeBranchName(
+  raw: string,
+  options?: WorktreeBranchNameOptions,
+): string {
+  const normalized = raw
+    .trim()
+    .toLowerCase()
+    .replace(/^refs\/heads\//, "")
+    .replace(/['"`]/g, "");
+
+  const currentPrefix = `${WORKTREE_BRANCH_PREFIX}/`;
+  const legacyPrefix = "t3code/";
+  let withoutPrefix = normalized;
+  if (withoutPrefix.startsWith(currentPrefix)) {
+    withoutPrefix = withoutPrefix.slice(currentPrefix.length);
+  } else if (withoutPrefix.startsWith(legacyPrefix)) {
+    withoutPrefix = withoutPrefix.slice(legacyPrefix.length);
+  }
+
+  const branchFragment = withoutPrefix
+    .replace(/[^a-z0-9/_-]+/g, "-")
+    .replace(/\/+/g, "/")
+    .replace(/-+/g, "-")
+    .replace(/^[./_-]+|[./_-]+$/g, "")
+    .slice(0, 64)
+    .replace(/[./_-]+$/g, "");
+
+  const safeFragment = branchFragment.length > 0 ? branchFragment : "update";
+  return withWorktreeBranchPrefix(safeFragment, options);
+}
+
+export function buildPullRequestCheckoutBranchName(input: {
+  readonly pullRequestId: number;
+  readonly headBranch: string;
+  readonly isCrossRepository: boolean;
+  readonly omitPrefix?: boolean;
+}): string {
+  if (!input.isCrossRepository) {
+    return input.headBranch;
+  }
+  const sanitizedHeadBranch = sanitizeBranchFragment(input.headBranch).trim();
+  const suffix = sanitizedHeadBranch.length > 0 ? sanitizedHeadBranch : "head";
+  const fragment = `pr-${input.pullRequestId}/${suffix}`;
+  // Pull-request checkouts stay on the hardcoded `t3code/` prefix. Temporary
+  // worktrees use WORKTREE_BRANCH_PREFIX (`t3`) instead.
+  return input.omitPrefix === true ? fragment : `t3code/${fragment}`;
 }
 
 /**
