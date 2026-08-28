@@ -19,6 +19,7 @@ import {
   AzureDevOpsIcon,
   BitbucketIcon,
   ForgejoIcon,
+  GiteaIcon,
   GitHubIcon,
   GitLabIcon,
 } from "./components/Icons";
@@ -63,6 +64,12 @@ export function getSourceControlPresentation(
         providerName: provider?.name || presentation.providerName,
         terminology: getChangeRequestTerminology(provider),
         Icon: ForgejoIcon,
+      };
+    case "gitea":
+      return {
+        providerName: provider?.name || presentation.providerName,
+        terminology: getChangeRequestTerminology(provider),
+        Icon: GiteaIcon,
       };
     case "change-request":
       return {

@@ -3,7 +3,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import { SourceControlProviderError, type ChangeRequest } from "@t3tools/contracts";
 
-import * as ForgejoApi from "./ForgejoApi.ts";
+import * as GiteaApi from "./GiteaApi.ts";
 import * as ForgejoPullRequests from "./forgejoPullRequests.ts";
 import * as SourceControlProvider from "./SourceControlProvider.ts";
 import * as SourceControlProviderDiscovery from "./SourceControlProviderDiscovery.ts";
@@ -13,10 +13,10 @@ function providerError(input: {
   readonly cwd: string;
   readonly reference?: string;
   readonly repository?: string;
-  readonly cause: ForgejoApi.ForgejoApiError;
+  readonly cause: GiteaApi.GiteaApiError;
 }): SourceControlProviderError {
   return new SourceControlProviderError({
-    provider: "forgejo",
+    provider: "gitea",
     operation: input.operation,
     cwd: input.cwd,
     ...(input.reference !== undefined
@@ -34,7 +34,7 @@ function toChangeRequest(
   summary: ForgejoPullRequests.NormalizedForgejoPullRequestRecord,
 ): ChangeRequest {
   return {
-    provider: "forgejo",
+    provider: "gitea",
     number: summary.number,
     title: summary.title,
     url: summary.url,
@@ -54,22 +54,59 @@ function toChangeRequest(
   };
 }
 
-export function parseForgejoAuthHosts(
-  output: string,
-): ReadonlyArray<{ readonly account: string; readonly host: string }> {
-  const entries: Array<{ account: string; host: string }> = [];
-  for (const line of output.split(/\r?\n/)) {
-    const match = /^([^@\s]+)@([a-z0-9][a-z0-9.-]*(?::\d+)?)$/iu.exec(line.trim());
-    if (match?.[1] && match[2]) {
-      entries.push({ account: match[1], host: match[2].toLowerCase() });
-    }
-  }
-  return entries;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function parseForgejoAuth(input: SourceControlProviderDiscovery.SourceControlAuthProbeInput) {
+function hostFromUrl(url: string): string | null {
+  try {
+    return new URL(url).host.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+function loginField(login: Record<string, unknown>, ...keys: string[]): string {
+  for (const key of keys) {
+    const value = login[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return "";
+}
+
+/** Parse `tea login list --output json` (array of login objects with url/user/name). */
+export function parseTeaLoginHosts(
+  output: string,
+): ReadonlyArray<{ readonly account: string; readonly host: string }> {
+  const trimmed = output.trim();
+  if (trimmed.length === 0) return [];
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    const logins = Array.isArray(parsed)
+      ? parsed
+      : isRecord(parsed) && Array.isArray(parsed.logins)
+        ? parsed.logins
+        : [];
+    const entries: Array<{ account: string; host: string }> = [];
+    for (const raw of logins) {
+      if (!isRecord(raw)) continue;
+      const url = loginField(raw, "url", "URL", "Url");
+      const host = hostFromUrl(url);
+      if (host === null) continue;
+      const account = loginField(raw, "user", "User", "name", "Name") || host;
+      entries.push({ account, host });
+    }
+    return entries;
+  } catch {
+    return [];
+  }
+}
+
+function parseGiteaAuth(input: SourceControlProviderDiscovery.SourceControlAuthProbeInput) {
   const output = SourceControlProviderDiscovery.combinedAuthOutput(input);
-  const hosts = parseForgejoAuthHosts(output);
+  const hosts = parseTeaLoginHosts(output);
   const first = hosts[0];
   if (first) {
     return SourceControlProviderDiscovery.providerAuth({
@@ -83,53 +120,53 @@ function parseForgejoAuth(input: SourceControlProviderDiscovery.SourceControlAut
       status: "unauthenticated",
       detail:
         SourceControlProviderDiscovery.firstSafeAuthLine(output) ??
-        "Run `fj auth login <host>` to authenticate the Forgejo CLI.",
+        "Run `tea login add` to authenticate the Gitea CLI.",
     });
   }
   return SourceControlProviderDiscovery.providerAuth({
     status: "unknown",
     detail:
       SourceControlProviderDiscovery.firstSafeAuthLine(output) ??
-      "Forgejo CLI auth status could not be parsed.",
+      "Gitea CLI auth status could not be parsed.",
   });
 }
 
-function refineUnknownForgejoRemote(
+function refineUnknownGiteaRemote(
   input: SourceControlProviderDiscovery.SourceControlUnknownRemoteRefinementInput,
 ) {
   const host = input.context.provider.name.toLowerCase();
-  const authenticated = parseForgejoAuthHosts(
+  const authenticated = parseTeaLoginHosts(
     SourceControlProviderDiscovery.combinedAuthOutput(input.auth),
-  ).some((entry) => ForgejoApi.forgejoHostsMatch(entry.host, host));
+  ).some((entry) => GiteaApi.forgejoHostsMatch(entry.host, host));
   if (!authenticated) return null;
   return {
-    kind: "forgejo",
-    name: "Forgejo",
+    kind: "gitea",
+    name: "Gitea",
     baseUrl: input.context.provider.baseUrl,
   } as const;
 }
 
 export const discovery = {
   type: "cli",
-  kind: "forgejo",
-  label: "Forgejo",
-  executable: "fj",
-  versionArgs: ["version"],
-  authArgs: ["auth", "list"],
-  parseAuth: parseForgejoAuth,
-  refineUnknownRemote: refineUnknownForgejoRemote,
+  kind: "gitea",
+  label: "Gitea",
+  executable: "tea",
+  versionArgs: ["--version"],
+  authArgs: ["login", "list", "--output", "json"],
+  parseAuth: parseGiteaAuth,
+  refineUnknownRemote: refineUnknownGiteaRemote,
   installHint:
-    "Install the Forgejo CLI (`fj`) from https://codeberg.org/forgejo-contrib/forgejo-cli and run `fj auth login <host>`.",
+    "Install the Gitea CLI (`tea`) from https://gitea.com/gitea/tea and run `tea login add`.",
 } satisfies SourceControlProviderDiscovery.SourceControlCliDiscoverySpec;
 
 export const make = Effect.gen(function* () {
-  const forgejo = yield* ForgejoApi.ForgejoApi;
+  const gitea = yield* GiteaApi.GiteaApi;
 
   return SourceControlProvider.SourceControlProvider.of({
-    kind: "forgejo",
+    kind: "gitea",
     listChangeRequests: (input) => {
       const source = SourceControlProvider.sourceControlRefFromInput(input);
-      return forgejo
+      return gitea
         .listPullRequests({
           cwd: input.cwd,
           ...(input.context ? { context: input.context } : {}),
@@ -151,7 +188,7 @@ export const make = Effect.gen(function* () {
         );
     },
     getChangeRequest: (input) =>
-      forgejo.getPullRequest(input).pipe(
+      gitea.getPullRequest(input).pipe(
         Effect.map(toChangeRequest),
         Effect.mapError((error) =>
           providerError({
@@ -164,7 +201,7 @@ export const make = Effect.gen(function* () {
       ),
     createChangeRequest: (input) => {
       const source = SourceControlProvider.sourceControlRefFromInput(input);
-      return forgejo
+      return gitea
         .createPullRequest({
           cwd: input.cwd,
           ...(input.context ? { context: input.context } : {}),
@@ -187,7 +224,7 @@ export const make = Effect.gen(function* () {
         );
     },
     getRepositoryCloneUrls: (input) =>
-      forgejo.getRepositoryCloneUrls(input).pipe(
+      gitea.getRepositoryCloneUrls(input).pipe(
         Effect.mapError((error) =>
           providerError({
             operation: "getRepositoryCloneUrls",
@@ -198,7 +235,7 @@ export const make = Effect.gen(function* () {
         ),
       ),
     createRepository: (input) =>
-      forgejo.createRepository(input).pipe(
+      gitea.createRepository(input).pipe(
         Effect.mapError((error) =>
           providerError({
             operation: "createRepository",
@@ -209,7 +246,7 @@ export const make = Effect.gen(function* () {
         ),
       ),
     getDefaultBranch: (input) =>
-      forgejo
+      gitea
         .getDefaultBranch({
           cwd: input.cwd,
           ...(input.context ? { context: input.context } : {}),
@@ -220,7 +257,7 @@ export const make = Effect.gen(function* () {
           ),
         ),
     checkoutChangeRequest: (input) =>
-      forgejo
+      gitea
         .checkoutPullRequest({
           cwd: input.cwd,
           ...(input.context ? { context: input.context } : {}),

@@ -1176,9 +1176,9 @@ export const make = Effect.gen(function* () {
     }
 
     // Forgejo and Gitea have no single canonical hostname, so static detection returns
-    // "unknown" for most self-hosted instances. Refine this branch's remote via `fj auth
-    // list` (not origin), and only adopt the result when it resolves to Forgejo so other
-    // providers keep their existing status behavior.
+    // "unknown" for most self-hosted instances. Refine this branch's remote via `fj` or
+    // `tea` logins (not origin), and only adopt the result when it resolves to those
+    // providers so other hosts keep their existing status behavior.
     if (!detected) return null;
     const handle = yield* sourceControlProviders
       .resolveHandle({
@@ -1191,7 +1191,7 @@ export const make = Effect.gen(function* () {
       })
       .pipe(Effect.orElseSucceed(() => null));
     const refined = handle?.context?.provider;
-    return refined?.kind === "forgejo" ? refined : detected;
+    return refined?.kind === "forgejo" || refined?.kind === "gitea" ? refined : detected;
   });
 
   const resolveRemoteRepositoryContext = Effect.fn("resolveRemoteRepositoryContext")(function* (
