@@ -46,6 +46,19 @@ describe("parseChangeRequestUrl", () => {
     );
   });
 
+  it("reads a Forgejo or Gitea pull request, including a self-hosted host", () => {
+    expect(parseChangeRequestUrl("https://codeberg.org/owner/repo/pulls/8")).toEqual({
+      host: "codeberg.org",
+      repository: "owner/repo",
+      number: 8,
+    });
+    expect(parseChangeRequestUrl("https://git.example.org/owner/repo/pulls/8")).toEqual({
+      host: "git.example.org",
+      repository: "owner/repo",
+      number: 8,
+    });
+  });
+
   it("reads Bitbucket and both Azure DevOps URL forms", () => {
     expect(parseChangeRequestUrl("https://bitbucket.org/workspace/repo/pull-requests/5")).toEqual({
       host: "bitbucket.org",
@@ -111,6 +124,7 @@ describe("siblingPullRequestUrl", () => {
       "https://bitbucket.org/acme/web/pull-requests/42",
       "https://bitbucket.org/acme/web/pull-requests/43",
     ],
+    ["https://codeberg.org/acme/web/pulls/42/files", "https://codeberg.org/acme/web/pulls/43"],
     [
       "https://dev.azure.com/acme/project/_git/web/pullrequest/42?view=files",
       "https://dev.azure.com/acme/project/_git/web/pullrequest/43",
@@ -138,5 +152,14 @@ describe("changeRequestUrlFor", () => {
       repository: "org/project/_git/web",
       number: 42,
     });
+  });
+
+  it("builds Forgejo and Gitea /pulls/{n} URLs", () => {
+    expect(changeRequestUrlFor("forgejo", "codeberg.org", "owner/repo", 8)).toBe(
+      "https://codeberg.org/owner/repo/pulls/8",
+    );
+    expect(changeRequestUrlFor("gitea", "gitea.com", "owner/repo", 8)).toBe(
+      "https://gitea.com/owner/repo/pulls/8",
+    );
   });
 });

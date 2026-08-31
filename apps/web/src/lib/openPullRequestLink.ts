@@ -6,6 +6,8 @@ import { pullRequestHostOf, type SourceControlProviderKind } from "@t3tools/cont
 import { parseChangeRequestUrl, type ChangeRequestLink } from "@t3tools/shared/changeRequestUrl";
 import {
   canonicalRepositoryKey,
+  changeRequestHasInAppReview,
+  isForgejoOrGiteaPullRequestUrl,
   sourceControlRepositorySelector,
 } from "@t3tools/shared/sourceControl";
 
@@ -106,8 +108,9 @@ export function findProjectOnChangeRequestHost(
  *
  * Given a thread, the link opens beside it in the right panel instead of taking the whole app to
  * the pull requests page: a reader following a link the agent wrote is reading the thread, and
- * should still be reading it afterwards. Any change request opens there, not only the thread's
- * own, since the panel is told which one to show.
+ * should still be reading it afterwards. Any change request with an in-app review surface opens
+ * there, not only the thread's own, since the panel is told which one to show. Forgejo and Gitea
+ * have no such surface, so those links stay ordinary and open on the host.
  */
 export function shouldOpenPullRequestExternally(
   event: Pick<MouseEvent<HTMLElement>, "metaKey" | "ctrlKey">,
@@ -138,6 +141,9 @@ export function useOpenChangeRequestLink(
       const resolvedPanelRef = panelRef ?? resolvedThreadRef;
       const parsed = parseChangeRequestUrl(targetUrl);
       if (parsed === null) return false;
+      // Recognised so linking and matching still work; the in-app panel cannot
+      // review Forgejo or Gitea, so those URLs stay ordinary links.
+      if (isForgejoOrGiteaPullRequestUrl(targetUrl)) return false;
       const reads = (environmentId: string) =>
         serverConfigs.get(environmentId as EnvironmentId)?.environment.capabilities.pullRequests ===
         true;
@@ -172,6 +178,7 @@ export function useOpenChangeRequestLink(
             )
           : undefined);
       if (project === undefined || !reads(project.environmentId)) return false;
+      if (!changeRequestHasInAppReview(project.repositoryIdentity?.provider)) return false;
       const repository =
         serverConfigs.get(project.environmentId)?.environment.capabilities.threadPullRequests ===
         true

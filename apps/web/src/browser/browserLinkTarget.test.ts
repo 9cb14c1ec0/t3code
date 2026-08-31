@@ -76,6 +76,36 @@ describe("resolveLinkTarget", () => {
       );
     }
   });
+
+  it("sends Forgejo and Gitea pull requests to the system browser even when in-app is preferred", () => {
+    expect(
+      resolveLinkTarget({
+        url: "https://codeberg.org/owner/repo/pulls/8",
+        event: click,
+        preference: "app",
+        canOpenInApp: true,
+      }),
+    ).toBe("system");
+    expect(
+      resolveLinkTarget({
+        url: "https://gitea.com/owner/repo/pulls/8/files",
+        event: click,
+        preference: "app",
+        canOpenInApp: true,
+      }),
+    ).toBe("system");
+  });
+
+  it("still opens GitHub pull requests in-app when asked", () => {
+    expect(
+      resolveLinkTarget({
+        url: "https://github.com/owner/repo/pull/8",
+        event: click,
+        preference: "app",
+        canOpenInApp: true,
+      }),
+    ).toBe("app");
+  });
 });
 
 describe("resolveBrowserLinkTargetPreference", () => {

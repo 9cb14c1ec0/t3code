@@ -9,6 +9,7 @@
  * @module browserLinkTarget
  */
 import type { BrowserLinkTarget } from "@t3tools/contracts";
+import { isForgejoOrGiteaPullRequestUrl } from "@t3tools/shared/sourceControl";
 
 import { ensureClientSettingsHydrated, getClientSettings } from "~/hooks/useSettings";
 import { isPreviewSupportedInRuntime } from "~/previewStateStore";
@@ -31,6 +32,9 @@ export interface ResolveLinkTargetInput {
  */
 export function resolveLinkTarget(input: ResolveLinkTargetInput): BrowserLinkTarget {
   if (input.event.metaKey || input.event.ctrlKey) return "system";
+  // Forgejo and Gitea have no in-app review panel. Even with "Open links in"
+  // set to the in-app browser, those pull requests belong on the host.
+  if (isForgejoOrGiteaPullRequestUrl(input.url)) return "system";
   if (input.preference !== "app") return "system";
   if (!input.canOpenInApp) return "system";
   if (!isWebUrl(input.url)) return "system";
