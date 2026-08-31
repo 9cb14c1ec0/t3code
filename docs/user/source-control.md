@@ -10,6 +10,8 @@ T3 Code works with the platforms your team already uses:
 - **GitLab** – Merge requests, repository publishing, and hosted clones
 - **Bitbucket** – Pull request workflows (via API token authentication)
 - **Azure DevOps** – Pull request support for Microsoft-hosted repositories
+- **Forgejo** – Pull requests and clones on Codeberg and self-hosted Forgejo instances (via the `fj` CLI)
+- **Gitea** – Pull requests and clones on gitea.com and self-hosted Gitea instances (via the `tea` CLI)
 
 ## What You Can Do
 
@@ -18,8 +20,8 @@ T3 Code works with the platforms your team already uses:
 **Clone repositories directly**
 
 - Open the Command Palette (`Cmd/Ctrl + K`) → **Add Project**
-- Choose **GitHub repository**, **GitLab repository**, **Bitbucket repository**, **Azure DevOps repository**, or paste any **Git URL**
-- Enter the repository path (`owner/repo`, `group/project`, `workspace/repository`, or `project/repository`) or a full Git URL, pick a destination, and start coding
+- Choose **GitHub repository**, **GitLab repository**, **Bitbucket repository**, **Azure DevOps repository**, **Forgejo repository**, **Gitea repository**, or paste any **Git URL**
+- Enter the repository path (`owner/repo`, `group/project`, `workspace/repository`, `project/repository`, or `host/owner/repo` for Forgejo or Gitea) or a full Git URL, pick a destination, and start coding
 
 **Publish local projects to the cloud**
 
@@ -36,7 +38,7 @@ T3 Code works with the platforms your team already uses:
 - With **Repository conventions** selected, generated source control text follows the project's
   `AGENTS.md` along with recent commit subjects. Claude writers also follow `CLAUDE.md`
 - New worktree branches and pull-request checkout branches are named `t3code/…` unless **Settings → General → Omit t3code/ from branch names** is on. That setting does not rename existing branches.
-- Supports GitHub Pull Requests, GitLab Merge Requests, Bitbucket Pull Requests, and Azure DevOps Pull Requests
+- Supports GitHub Pull Requests, GitLab Merge Requests, Bitbucket Pull Requests, Azure DevOps Pull Requests, Forgejo Pull Requests, and Gitea Pull Requests
 
 **Stay on top of open reviews**
 
@@ -119,6 +121,36 @@ export T3CODE_BITBUCKET_API_TOKEN="your-token"
 If both are set, the access token wins. Restart T3 Code and verify the connection in **Source
 Control settings**.
 
+### For Forgejo
+
+Forgejo has no single public host — most instances are self-hosted. T3 Code recognizes Codeberg and any host whose name includes `forgejo` or `codeberg`. Other hosts are detected after you log in with the Forgejo CLI.
+
+1. Install the Forgejo CLI (`fj`) from [forgejo-cli](https://codeberg.org/forgejo-contrib/forgejo-cli)
+2. Sign in to each instance:
+   ```bash
+   fj auth login git.example.org
+   ```
+3. Open **Settings → Source Control** in T3 Code and verify Forgejo shows as authenticated
+
+You can then clone with `host/owner/repo` (or `owner/repo` when only one instance is logged in) and create or check out pull requests from the Git toolbar.
+
+### For Gitea
+
+Gitea is a separate provider from Forgejo. T3 Code recognizes gitea.com and any host whose name includes `gitea`. Other hosts are detected after you log in with the Gitea CLI.
+
+1. Install the Gitea CLI (`tea`) from [tea](https://gitea.com/gitea/tea)
+2. Sign in with an **application token** when you can. OAuth also works (`tea login add --oauth`), but those tokens live in the OS keyring and T3 Code reads them through `tea login helper get`:
+   ```bash
+   tea login add
+   ```
+3. Open **Settings → Source Control** in T3 Code and verify Gitea shows as authenticated
+
+You can then clone with `host/owner/repo` (or `owner/repo` when only one instance is logged in) and create or check out pull requests from the Git toolbar.
+
+The dedicated Pull requests inbox does not list Forgejo or Gitea yet; use the Git toolbar and the host's own page for reviews.
+
+The **Publish Repository** picker is also still GitHub, GitLab, Bitbucket, and Azure DevOps only. Clone an existing Forgejo or Gitea repo, or paste a Git URL.
+
 ### For Azure DevOps
 
 1. Install Azure CLI:
@@ -154,3 +186,5 @@ Control settings**.
 - [GitHub CLI](https://cli.github.com/)
 - [GitLab CLI](https://gitlab.com/gitlab-org/cli)
 - [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/)
+- [Forgejo CLI](https://codeberg.org/forgejo-contrib/forgejo-cli)
+- [Gitea CLI (tea)](https://gitea.com/gitea/tea)
