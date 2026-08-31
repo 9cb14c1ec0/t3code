@@ -127,6 +127,12 @@ describe("changeRequestRepositoryUrl", () => {
       ),
     ).toBe("https://gitlab.example.test/group/pull/123/repo");
   });
+
+  it("strips a Forgejo or Gitea /pulls/{n} suffix", () => {
+    expect(changeRequestRepositoryUrl("https://codeberg.org/Owner/Repo/pulls/8/files")).toBe(
+      "https://codeberg.org/Owner/Repo",
+    );
+  });
 });
 
 describe("pullRequestCandidateUrlFromReferenceAutolink", () => {
@@ -235,6 +241,19 @@ describe("parseChangeRequestUrl", () => {
       host: "bitbucket.org",
       repository: "workspace/repo",
       number: 5,
+    });
+  });
+
+  it("reads a Forgejo or Gitea pull request, including a self-hosted host", () => {
+    expect(parseChangeRequestUrl("https://codeberg.org/owner/repo/pulls/8")).toEqual({
+      host: "codeberg.org",
+      repository: "owner/repo",
+      number: 8,
+    });
+    expect(parseChangeRequestUrl("https://git.example.org/owner/repo/pulls/8")).toEqual({
+      host: "git.example.org",
+      repository: "owner/repo",
+      number: 8,
     });
   });
 

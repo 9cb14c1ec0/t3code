@@ -15,6 +15,7 @@ import type {
   SourceControlRepositoryVisibility,
   VcsStatusResult,
 } from "@t3tools/contracts";
+import { changeRequestHasInAppReview } from "@t3tools/shared/sourceControl";
 import { useNavigate } from "@tanstack/react-router";
 import * as Option from "effect/Option";
 import {
@@ -1235,8 +1236,13 @@ export default function GitActionsControl({
   const openExistingPr = useCallback(async () => {
     const openPr = gitStatusForActions?.pr?.state === "open" ? gitStatusForActions.pr : null;
     // Beside the thread where it was made, the way the browser opens beside it. Checked before
-    // the shell, which opening in the app does not need.
-    if (openPr && onOpenPullRequest) {
+    // the shell, which opening in the app does not need. Forgejo and Gitea have no in-app
+    // review surface, so those go to the host instead.
+    if (
+      openPr &&
+      onOpenPullRequest &&
+      changeRequestHasInAppReview(gitStatusForActions?.sourceControlProvider?.kind)
+    ) {
       onOpenPullRequest(openPr.number);
       return;
     }

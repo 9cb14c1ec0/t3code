@@ -166,6 +166,7 @@ import { writeTextToClipboard } from "../hooks/useCopyToClipboard";
 import { isCommandPaletteOpen } from "../commandPaletteBus";
 import { subscribeSnapShotComposerFocus } from "../lib/desktopSnapShot";
 import { buildTemporaryWorktreeBranchName } from "@t3tools/shared/git";
+import { changeRequestHasInAppReview } from "@t3tools/shared/sourceControl";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { RIGHT_PANEL_INLINE_LAYOUT_MEDIA_QUERY } from "../rightPanelLayout";
 import {
@@ -2316,6 +2317,9 @@ export default function ChatView(props: ChatViewProps) {
   });
   const pullRequestsCapabilityKnown = serverConfig !== null;
   const supportsPullRequests = serverConfig?.environment.capabilities.pullRequests === true;
+  const canOpenPullRequestInApp =
+    supportsPullRequests &&
+    changeRequestHasInAppReview(activeProject?.repositoryIdentity?.provider);
   const attachmentEnvironmentConfig = environmentById.get(environmentId)?.serverConfig ?? null;
   const attachmentUploadsCapabilityKnown = attachmentEnvironmentConfig !== null;
   const supportsQuestionAttachments =
@@ -4138,7 +4142,7 @@ export default function ChatView(props: ChatViewProps) {
   const openProjectPullRequest = useCallback(
     (number: number) => {
       if (
-        !supportsPullRequests ||
+        !canOpenPullRequestInApp ||
         !activeThreadRef ||
         !activeProject ||
         activeProjectRepository === null
@@ -4151,7 +4155,7 @@ export default function ChatView(props: ChatViewProps) {
         number,
       });
     },
-    [activeProject, activeProjectRepository, activeThreadRef, supportsPullRequests],
+    [activeProject, activeProjectRepository, activeThreadRef, canOpenPullRequestInApp],
   );
   const proactivePanelObservationRef = useRef<ReturnType<
     typeof observeProactivePanelUserChoice
@@ -4234,7 +4238,7 @@ export default function ChatView(props: ChatViewProps) {
       !followSelectedPullRequest &&
       eligibleLink &&
       pullRequestsCapabilityKnown &&
-      supportsPullRequests &&
+      canOpenPullRequestInApp &&
       linkedThreadPullRequest !== null
     ) {
       panels.openProactive(
@@ -4266,7 +4270,7 @@ export default function ChatView(props: ChatViewProps) {
     pullRequestsCapabilityKnown,
     settings.proactivePanelsEnabled,
     shouldUseRightPanelSheet,
-    supportsPullRequests,
+    canOpenPullRequestInApp,
     threadDetailLoading,
   ]);
   const togglePreviewPanel = useCallback(() => {
@@ -5389,11 +5393,11 @@ export default function ChatView(props: ChatViewProps) {
     );
   }, [activeThreadReferenceCopyTarget]);
   const addPullRequestSurface = useCallback(() => {
-    if (!supportsPullRequests || activeThreadRef === null || linkedThreadPullRequest === null)
+    if (!canOpenPullRequestInApp || activeThreadRef === null || linkedThreadPullRequest === null)
       return;
     useRightPanelStore.getState().openPullRequest(activeThreadRef, linkedThreadPullRequest);
-  }, [activeThreadRef, linkedThreadPullRequest, supportsPullRequests]);
-  const pullRequestSurfaceAvailable = supportsPullRequests && linkedThreadPullRequest !== null;
+  }, [activeThreadRef, linkedThreadPullRequest, canOpenPullRequestInApp]);
+  const pullRequestSurfaceAvailable = canOpenPullRequestInApp && linkedThreadPullRequest !== null;
   const supportsSettlement = serverConfig?.environment.capabilities.threadSettlement === true;
   const supportsSnooze = serverConfig?.environment.capabilities.threadSnooze === true;
   const supportsPinning = serverConfig?.environment.capabilities.threadPinning === true;
@@ -8087,7 +8091,7 @@ export default function ChatView(props: ChatViewProps) {
           ) : null}
           {!rightPanelControlsAtRoot && !rightPanelControlsInPanel ? panelLayoutControls : null}
           <ChatHeader
-            {...(!supportsPullRequests || activeProjectRepository === null
+            {...(!canOpenPullRequestInApp || activeProjectRepository === null
               ? {}
               : { onOpenPullRequest: openProjectPullRequest })}
             activeThreadEnvironmentId={activeThread.environmentId}

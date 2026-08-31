@@ -8,6 +8,10 @@ import { useNavigate } from "@tanstack/react-router";
 import { type MouseEvent, useCallback } from "react";
 
 import { pullRequestHostOf, type SourceControlProviderKind } from "@t3tools/contracts";
+import {
+  changeRequestHasInAppReview,
+  isForgejoOrGiteaPullRequestUrl,
+} from "@t3tools/shared/sourceControl";
 
 import { useOpenLink } from "../browser/useOpenLink";
 import { stackedThreadToast, toastManager } from "../components/ui/toast";
@@ -114,6 +118,10 @@ export function parseChangeRequestUrl(targetUrl: string): ChangeRequestLink | nu
     const match = /^\/([^/]+\/[^/]+)\/pull-requests\/(\d+)(?:\/|$)/u.exec(url.pathname);
     return claim(host, match);
   }
+  // Forgejo / Gitea / Codeberg: /{owner}/{repo}/pulls/{n}. The `/pulls/` segment is
+  // their own (GitHub uses `/pull/`), so a self-hosted instance can keep any hostname.
+  const forgejo = /^\/([^/]+\/[^/]+)\/pulls\/(\d+)(?:\/|$)/u.exec(url.pathname);
+  if (forgejo) return claim(host, forgejo);
   // Azure DevOps, both the current host and the per-organisation one it replaced. `_git` is part
   // of the repository path there, as it is in the remote URL the identity is read from.
   if (isHostOf(host, "dev.azure.com") || host.endsWith(".visualstudio.com")) {
@@ -170,7 +178,7 @@ export function changeRequestRepositoryUrl(targetUrl: string): string | null {
   const url = new URL(targetUrl);
   const repositoryPath =
     /^(.*?)\/-\/merge_requests\/\d+(?:\/|$)/iu.exec(url.pathname)?.[1] ??
-    /^(.*?)(?:\/pull\/\d+|\/-\/merge_requests\/\d+|\/pull-requests\/\d+|\/pullrequest\/\d+)(?:\/|$)/iu.exec(
+    /^(.*?)(?:\/pull\/\d+|\/pulls\/\d+|\/-\/merge_requests\/\d+|\/pull-requests\/\d+|\/pullrequest\/\d+)(?:\/|$)/iu.exec(
       url.pathname,
     )?.[1];
   if (!repositoryPath) return null;
@@ -232,8 +240,9 @@ export function findProjectForChangeRequest(
  *
  * Given a thread, the link opens beside it in the right panel instead of taking the whole app to
  * the pull requests page: a reader following a link the agent wrote is reading the thread, and
- * should still be reading it afterwards. Any change request opens there, not only the thread's
- * own, since the panel is told which one to show.
+ * should still be reading it afterwards. Any change request with an in-app review surface opens
+ * there, not only the thread's own, since the panel is told which one to show. Forgejo and Gitea
+ * have no such surface, so those links stay ordinary and open on the host.
  */
 export function shouldOpenPullRequestExternally(
   event: Pick<MouseEvent<HTMLElement>, "metaKey" | "ctrlKey">,
@@ -264,6 +273,9 @@ export function useOpenChangeRequestLink(
       const resolvedPanelRef = panelRef ?? resolvedThreadRef;
       const parsed = parseChangeRequestUrl(targetUrl);
       if (parsed === null) return false;
+      // Recognised so linking and matching still work; the in-app panel cannot
+      // review Forgejo or Gitea, so those URLs stay ordinary links.
+      if (isForgejoOrGiteaPullRequestUrl(targetUrl)) return false;
       const reads = (environmentId: string) =>
         serverConfigs.get(environmentId as EnvironmentId)?.environment.capabilities.pullRequests ===
         true;
@@ -286,6 +298,7 @@ export function useOpenChangeRequestLink(
               );
       const project = findProjectForChangeRequest(projects, parsed);
       if (project === undefined || !reads(project.environmentId)) return false;
+      if (!changeRequestHasInAppReview(project.repositoryIdentity?.provider)) return false;
       event.preventDefault();
       event.stopPropagation();
       if (resolvedPanelRef) {

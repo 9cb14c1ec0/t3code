@@ -1,7 +1,14 @@
 import type { SourceControlProviderInfo, SourceControlProviderKind } from "@t3tools/contracts";
 
 export interface ChangeRequestPresentation {
-  readonly icon: "github" | "gitlab" | "azure-devops" | "bitbucket" | "change-request";
+  readonly icon:
+    | "github"
+    | "gitlab"
+    | "azure-devops"
+    | "bitbucket"
+    | "forgejo"
+    | "gitea"
+    | "change-request";
   readonly providerName: string;
   readonly shortName: string;
   readonly longName: string;
@@ -64,6 +71,28 @@ const BITBUCKET_CHANGE_REQUEST_PRESENTATION: ChangeRequestPresentation = {
   urlExample: "https://bitbucket.org/workspace/repo/pull-requests/42",
 };
 
+const FORGEJO_CHANGE_REQUEST_PRESENTATION: ChangeRequestPresentation = {
+  icon: "forgejo",
+  providerName: "Forgejo",
+  shortName: "PR",
+  longName: "pull request",
+  pluralLongName: "pull requests",
+  providerLongName: "Forgejo pull request",
+  checkoutCommandExample: "fj pr checkout 123",
+  urlExample: "https://codeberg.org/owner/repo/pulls/42",
+};
+
+const GITEA_CHANGE_REQUEST_PRESENTATION: ChangeRequestPresentation = {
+  icon: "gitea",
+  providerName: "Gitea",
+  shortName: "PR",
+  longName: "pull request",
+  pluralLongName: "pull requests",
+  providerLongName: "Gitea pull request",
+  checkoutCommandExample: "tea pr checkout 123",
+  urlExample: "https://gitea.com/owner/repo/pulls/42",
+};
+
 const GENERIC_CHANGE_REQUEST_PRESENTATION: ChangeRequestPresentation = {
   icon: "change-request",
   providerName: "source control",
@@ -87,6 +116,10 @@ export function resolveChangeRequestPresentation(
       return AZURE_DEVOPS_CHANGE_REQUEST_PRESENTATION;
     case "bitbucket":
       return BITBUCKET_CHANGE_REQUEST_PRESENTATION;
+    case "forgejo":
+      return FORGEJO_CHANGE_REQUEST_PRESENTATION;
+    case "gitea":
+      return GITEA_CHANGE_REQUEST_PRESENTATION;
     case "unknown":
       return GENERIC_CHANGE_REQUEST_PRESENTATION;
   }
@@ -120,6 +153,49 @@ export function getChangeRequestTerminologyForKind(
     shortLabel: presentation.shortName,
     singular: presentation.longName,
   };
+}
+
+/**
+ * The in-app review panel can load GitHub, GitLab, Bitbucket, and Azure DevOps.
+ * Forgejo and Gitea have no review surface yet, so their pull requests open on
+ * the host in the system browser. A missing kind keeps the in-app path.
+ */
+export function changeRequestHasInAppReview(
+  kind: SourceControlProviderKind | string | null | undefined,
+): boolean {
+  switch (kind) {
+    case "github":
+    case "gitlab":
+    case "azure-devops":
+    case "bitbucket":
+    case undefined:
+    case null:
+      return true;
+    case "forgejo":
+    case "gitea":
+    case "unknown":
+      return false;
+    default:
+      return true;
+  }
+}
+
+const FORGEJO_GITEA_PULL_REQUEST_PATH = /^\/[^/]+\/[^/]+\/pulls\/\d+(?:\/|$)/u;
+
+/** Forgejo, Gitea, and Codeberg write pull requests as `/{owner}/{repo}/pulls/{n}`. */
+export function isForgejoOrGiteaPullRequestPath(pathname: string): boolean {
+  return FORGEJO_GITEA_PULL_REQUEST_PATH.test(pathname);
+}
+
+/** True for an http(s) Forgejo or Gitea pull request URL, including self-hosted hosts. */
+export function isForgejoOrGiteaPullRequestUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
+    return isForgejoOrGiteaPullRequestPath(parsed.pathname);
+  } catch {
+    return false;
+  }
 }
 
 const SCP_SSH_REMOTE_PATTERN = /^[a-zA-Z0-9._-]+@([^:/]+):/;
@@ -187,6 +263,24 @@ function isBitbucketHost(host: string): boolean {
   return host === "bitbucket.org" || hasDnsLabel(host, "bitbucket");
 }
 
+function isForgejoHost(host: string): boolean {
+  return host === "codeberg.org" || hasDnsLabel(host, "forgejo") || hasDnsLabel(host, "codeberg");
+}
+
+function isGiteaHost(host: string): boolean {
+  return host === "gitea.com" || hasDnsLabel(host, "gitea");
+}
+
+function forgejoProviderName(hostname: string): string {
+  if (hostname === "codeberg.org") return "Codeberg";
+  if (hasDnsLabel(hostname, "codeberg")) return "Codeberg Self-Hosted";
+  return "Forgejo";
+}
+
+function giteaProviderName(hostname: string): string {
+  return hostname === "gitea.com" ? "Gitea" : "Gitea Self-Hosted";
+}
+
 export function detectSourceControlProviderFromRemoteUrl(
   remoteUrl: string,
 ): SourceControlProviderInfo | null {
@@ -224,6 +318,22 @@ export function detectSourceControlProviderFromRemoteUrl(
     return {
       kind: "bitbucket",
       name: hostname === "bitbucket.org" ? "Bitbucket" : "Bitbucket Self-Hosted",
+      baseUrl: toBaseUrl(host),
+    };
+  }
+
+  if (isForgejoHost(hostname)) {
+    return {
+      kind: "forgejo",
+      name: forgejoProviderName(hostname),
+      baseUrl: toBaseUrl(host),
+    };
+  }
+
+  if (isGiteaHost(hostname)) {
+    return {
+      kind: "gitea",
+      name: giteaProviderName(hostname),
       baseUrl: toBaseUrl(host),
     };
   }
