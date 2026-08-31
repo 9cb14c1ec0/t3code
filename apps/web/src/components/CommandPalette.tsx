@@ -146,7 +146,14 @@ import { orderItemsByPreferredIds, sortLogicalProjectsForSidebar } from "./Sideb
 import { resolveEnvironmentOptionLabel } from "./BranchToolbar.logic";
 import { CommandPaletteContent } from "./CommandPaletteContent";
 import { CommandPaletteResults } from "./CommandPaletteResults";
-import { AzureDevOpsIcon, BitbucketIcon, GitHubIcon, GitLabIcon } from "./Icons";
+import {
+  AzureDevOpsIcon,
+  BitbucketIcon,
+  ForgejoIcon,
+  GiteaIcon,
+  GitHubIcon,
+  GitLabIcon,
+} from "./Icons";
 import { EnvironmentMachineIcon } from "./EnvironmentMachineIcon";
 import { ProjectFavicon } from "./ProjectFavicon";
 import { ProjectFilePicker } from "./files/ProjectFilePicker";
@@ -216,7 +223,7 @@ interface AddProjectEnvironmentOption {
 
 type AddProjectRemoteProviderKind = Extract<
   SourceControlProviderKind,
-  "github" | "gitlab" | "bitbucket" | "azure-devops"
+  "github" | "gitlab" | "bitbucket" | "azure-devops" | "forgejo" | "gitea"
 >;
 type AddProjectRemoteSource = AddProjectRemoteProviderKind | "url";
 
@@ -241,12 +248,16 @@ const REMOTE_PROJECT_SOURCES: ReadonlyArray<AddProjectRemoteSource> = [
   "gitlab",
   "bitbucket",
   "azure-devops",
+  "forgejo",
+  "gitea",
 ];
 const REMOTE_PROJECT_PROVIDER_SOURCES: ReadonlyArray<AddProjectRemoteProviderKind> = [
   "github",
   "gitlab",
   "bitbucket",
   "azure-devops",
+  "forgejo",
+  "gitea",
 ];
 
 function remoteProjectSourceLabel(source: AddProjectRemoteSource): string {
@@ -259,6 +270,10 @@ function remoteProjectSourceLabel(source: AddProjectRemoteSource): string {
       return "Bitbucket";
     case "azure-devops":
       return "Azure DevOps";
+    case "forgejo":
+      return "Forgejo";
+    case "gitea":
+      return "Gitea";
     case "url":
       return "Git URL";
   }
@@ -274,6 +289,10 @@ function remoteProjectSourcePathHint(source: AddProjectRemoteSource): string {
       return "workspace/repository";
     case "azure-devops":
       return "project/repository";
+    case "forgejo":
+      return "host/owner/repo";
+    case "gitea":
+      return "host/owner/repo";
     case "url":
       return "URL";
   }
@@ -295,6 +314,10 @@ function remoteProjectSourceIcon(source: AddProjectRemoteSource, className: stri
       return <BitbucketIcon className={className} />;
     case "azure-devops":
       return <AzureDevOpsIcon className={className} />;
+    case "forgejo":
+      return <ForgejoIcon className={className} />;
+    case "gitea":
+      return <GiteaIcon className={className} />;
     case "url":
       return <LinkIcon className={className} />;
   }
@@ -344,6 +367,8 @@ function buildAddProjectRemoteSourceReadiness(
     gitlab: unavailable,
     bitbucket: unavailable,
     "azure-devops": unavailable,
+    forgejo: unavailable,
+    gitea: unavailable,
   };
 
   if (!discovery) {

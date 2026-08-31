@@ -1075,6 +1075,16 @@ const PROVIDER_REQUIREMENT: Partial<
     unauthenticated:
       "Bitbucket rejected the configured credentials. Check T3CODE_BITBUCKET_EMAIL and T3CODE_BITBUCKET_API_TOKEN.",
   },
+  forgejo: {
+    missing:
+      "Forgejo CLI (`fj`) is required to browse change requests on this host. Install it from https://codeberg.org/forgejo-contrib/forgejo-cli and reload.",
+    unauthenticated: "Forgejo CLI is not authenticated. Run `fj auth login <host>` and retry.",
+  },
+  gitea: {
+    missing:
+      "Gitea CLI (`tea`) is required to browse change requests on this host. Install it from https://gitea.com/gitea/tea and reload.",
+    unauthenticated: "Gitea CLI is not authenticated. Run `tea login add` and retry.",
+  },
 };
 
 /**
