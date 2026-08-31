@@ -28,6 +28,14 @@ describe("source control presentation", () => {
       shortLabel: "PR",
       singular: "pull request",
     });
+    expect(getChangeRequestTerminologyForKind("forgejo")).toEqual({
+      shortLabel: "PR",
+      singular: "pull request",
+    });
+    expect(getChangeRequestTerminologyForKind("gitea")).toEqual({
+      shortLabel: "PR",
+      singular: "pull request",
+    });
   });
 
   it("falls back to generic change request copy for unknown providers", () => {
@@ -158,5 +166,64 @@ describe("isSshRemoteUrl", () => {
     expect(isSshRemoteUrl("/home/user/repos/project")).toBe(false);
     expect(isSshRemoteUrl("")).toBe(false);
     expect(isSshRemoteUrl("deploy@github.com/project/repo")).toBe(false);
+  });
+});
+
+describe("forgejo and gitea support", () => {
+  it("resolves Forgejo presentation", () => {
+    const presentation = resolveChangeRequestPresentation({
+      kind: "forgejo",
+      name: "Forgejo",
+      baseUrl: "https://codeberg.org",
+    });
+    expect(presentation.icon).toBe("forgejo");
+    expect(presentation.providerName).toBe("Forgejo");
+    expect(presentation.shortName).toBe("PR");
+  });
+
+  it("resolves Gitea presentation", () => {
+    const presentation = resolveChangeRequestPresentation({
+      kind: "gitea",
+      name: "Gitea",
+      baseUrl: "https://gitea.com",
+    });
+    expect(presentation.icon).toBe("gitea");
+    expect(presentation.providerName).toBe("Gitea");
+    expect(presentation.shortName).toBe("PR");
+  });
+
+  it("detects Codeberg, Gitea, and Forgejo hosts", () => {
+    expect(detectSourceControlProviderFromRemoteUrl("git@codeberg.org:owner/repo.git")).toEqual({
+      kind: "forgejo",
+      name: "Codeberg",
+      baseUrl: "https://codeberg.org",
+    });
+    expect(detectSourceControlProviderFromRemoteUrl("https://gitea.com/owner/repo.git")).toEqual({
+      kind: "gitea",
+      name: "Gitea",
+      baseUrl: "https://gitea.com",
+    });
+    expect(
+      detectSourceControlProviderFromRemoteUrl("https://forgejo.example.org/owner/repo.git")?.kind,
+    ).toBe("forgejo");
+    expect(
+      detectSourceControlProviderFromRemoteUrl("https://gitea.example.org/owner/repo.git")?.kind,
+    ).toBe("gitea");
+  });
+
+  it("leaves an arbitrary self-hosted host as unknown (refined later via fj)", () => {
+    expect(
+      detectSourceControlProviderFromRemoteUrl("https://git.example.org/owner/repo.git")?.kind,
+    ).toBe("unknown");
+  });
+
+  it("does not match forgejo or gitea names embedded in unrelated DNS labels", () => {
+    expect(
+      detectSourceControlProviderFromRemoteUrl("https://notforgejo.example.com/owner/repo.git")
+        ?.kind,
+    ).toBe("unknown");
+    expect(
+      detectSourceControlProviderFromRemoteUrl("https://notgitea.example.com/owner/repo.git")?.kind,
+    ).toBe("unknown");
   });
 });
