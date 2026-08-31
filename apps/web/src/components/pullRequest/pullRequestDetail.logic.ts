@@ -83,6 +83,10 @@ export function pullRequestCheckoutCommand(
       }
       return `git clone --single-branch --branch ${headBranch} https://bitbucket.org/${headRepositoryNameWithOwner}.git t3code-pr-${number}`;
     }
+    case "forgejo":
+      return `fj pr checkout ${number}`;
+    case "gitea":
+      return `tea pr checkout ${number}`;
     case "unknown":
       return null;
   }

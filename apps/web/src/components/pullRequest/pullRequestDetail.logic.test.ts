@@ -51,6 +51,8 @@ describe("pull request checkout commands", () => {
       "maria/t3code",
       "git clone --single-branch --branch feature/checkout https://bitbucket.org/maria/t3code.git t3code-pr-42",
     ],
+    ["forgejo", "feature", null, "fj pr checkout 42"],
+    ["gitea", "feature", null, "tea pr checkout 42"],
     ["unknown", "feature", null, null],
   ] as const)("builds the %s command", (provider, branch, repository, expected) => {
     expect(pullRequestCheckoutCommand(provider, 42, branch, repository)).toBe(expected);
