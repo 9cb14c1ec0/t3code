@@ -48,6 +48,8 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import {
   AzureDevOpsIcon,
   BitbucketIcon,
+  ForgejoIcon,
+  GiteaIcon,
   GitHubIcon,
   GitIcon,
   GitLabIcon,
@@ -76,6 +78,8 @@ const SOURCE_CONTROL_PROVIDER_ICONS: Partial<Record<SourceControlProviderKind, I
   gitlab: GitLabIcon,
   "azure-devops": AzureDevOpsIcon,
   bitbucket: BitbucketIcon,
+  forgejo: ForgejoIcon,
+  gitea: GiteaIcon,
 };
 
 const VCS_ICONS: Partial<Record<VcsDriverKind, Icon>> = {
