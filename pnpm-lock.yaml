@@ -17809,7 +17809,7 @@ snapshots:
 
   expo-speech@57.0.2(expo@57.0.18):
     dependencies:
-      expo: 57.0.18(fc5a731e35a0144aab60c7305f29cbed)
+      expo: 57.0.18(41fd11498a34454c91128cdad32f22f8)
 
   expo-splash-screen@57.0.8(expo@57.0.18)(typescript@7.0.2):
     dependencies:
