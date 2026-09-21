@@ -94,7 +94,7 @@ Choose the writing style and model in **Settings → Source Control**. **Reposit
 uses the project's instructions and recent commit subjects.
 
 New worktree branches and pull-request checkout branches are named `t3code/…` unless **Settings →
-General → Omit t3code/ from branch names** is on. That setting does not rename existing branches.
+Projects & threads → Omit t3code/ from branch names** is on. That setting does not rename existing branches.
 
 ## Review and merge
 
