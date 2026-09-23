@@ -43,5 +43,10 @@ jobs:
       - name: Install browser secret helper build libraries
         run: sudo apt-get update && sudo apt-get install -y libsecret-1-dev pkg-config
 
+      # Desktop and web tests both touch Electron. Installing it once here
+      # avoids a parallel download race that leaves a broken runtime.
+      - name: Ensure Electron runtime is installed
+        run: vp run --filter @t3tools/desktop ensure:electron
+
       - name: Test
         run: vp run test
