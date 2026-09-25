@@ -2,9 +2,10 @@
 # GitHub-hosted runners. Upstream's release.yml cannot run here (org-specific
 # blacksmith runners, Cloudflare/Azure/Apple secrets), so this workflow covers
 # the fork's needs: unsigned desktop artifacts whose embedded update feed
-# points at this fork (via GITHUB_REPOSITORY), plus an arm64 production APK
-# signed with the ANDROID_DEBUG_KEYSTORE_B64 secret so it updates in place
-# over existing sideloaded installs.
+# points at this fork (via GITHUB_REPOSITORY). Linux ships an AppImage and a
+# .deb; electron-updater picks the matching file from nightly-linux.yml.
+# An arm64 production APK is signed with the ANDROID_DEBUG_KEYSTORE_B64
+# secret so it updates in place over existing sideloaded installs.
 name: Fork Nightly
 
 on:
@@ -297,6 +298,7 @@ jobs:
             "release/*.dmg" \
             "release/*.zip" \
             "release/*.AppImage" \
+            "release/*.deb" \
             "release/*.exe" \
             "release/*.blockmap" \
             "release/*.yml"; do
@@ -307,6 +309,13 @@ jobs:
               cp "$file" release-publish/
             done
           done
+          # The Linux job builds the .deb beside the AppImage. nightly-linux.yml
+          # lists both, and a .deb install updates itself only when that file
+          # is on the same GitHub release.
+          if [[ "${{ matrix.platform }}" == "linux" ]] && ! compgen -G "release-publish/*.deb" >/dev/null; then
+            echo "Linux build did not produce a .deb." >&2
+            exit 1
+          fi
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7
