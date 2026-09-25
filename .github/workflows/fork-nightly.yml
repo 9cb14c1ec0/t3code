@@ -361,6 +361,27 @@ jobs:
         working-directory: apps/mobile
         run: APP_VARIANT=production EXPO_NO_GIT_STATUS=1 npx expo prebuild --clean --platform android
 
+      # React Native's app CMake does find_package(fbjni). AGP only extracts
+      # prefabs from direct dependencies, and fbjni arrives transitively
+      # through react-android, so the configure step cannot see it.
+      - name: Depend on fbjni directly
+        shell: bash
+        run: |
+          python3 - << 'PY'
+          from pathlib import Path
+          path = Path("apps/mobile/android/app/build.gradle")
+          text = path.read_text()
+          dep = 'implementation("com.facebook.fbjni:fbjni:0.7.0")'
+          if "com.facebook.fbjni:fbjni" in text:
+              raise SystemExit(0)
+          marker = "dependencies {"
+          index = text.rfind(marker)
+          if index < 0:
+              raise SystemExit("android/app/build.gradle has no dependencies block")
+          insert_at = index + len(marker)
+          path.write_text(text[:insert_at] + "\n    " + dep + text[insert_at:])
+          PY
+
       # Overwrite the template keystore so every CI APK carries the same
       # signature as existing sideloaded installs (in-place updates).
       - name: Install signing keystore
