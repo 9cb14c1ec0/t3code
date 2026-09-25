@@ -361,25 +361,26 @@ jobs:
         working-directory: apps/mobile
         run: APP_VARIANT=production EXPO_NO_GIT_STATUS=1 npx expo prebuild --clean --platform android
 
-      # React Native's app CMake does find_package(fbjni). AGP only extracts
-      # prefabs from direct dependencies, and fbjni arrives transitively
-      # through react-android, so the configure step cannot see it.
-      - name: Depend on fbjni directly
+      # AGP 8.12 builds release native code as RelWithDebInfo. fbjni's
+      # prefab is published for debug and release only, so find_package fails
+      # until the release variant asks for the release prefab.
+      - name: Use the release fbjni prefab
         shell: bash
         run: |
           python3 - << 'PY'
           from pathlib import Path
           path = Path("apps/mobile/android/app/build.gradle")
           text = path.read_text()
-          dep = 'implementation("com.facebook.fbjni:fbjni:0.7.0")'
-          if "com.facebook.fbjni:fbjni" in text:
+          block = """
+          androidComponents {
+              onVariants(selector().withBuildType("release")) { variant ->
+                  variant.externalNativeBuild.cmake.buildType.set("release")
+              }
+          }
+          """
+          if "cmake.buildType.set" in text:
               raise SystemExit(0)
-          marker = "dependencies {"
-          index = text.rfind(marker)
-          if index < 0:
-              raise SystemExit("android/app/build.gradle has no dependencies block")
-          insert_at = index + len(marker)
-          path.write_text(text[:insert_at] + "\n    " + dep + text[insert_at:])
+          path.write_text(text.rstrip() + "\n" + block)
           PY
 
       # Overwrite the template keystore so every CI APK carries the same
