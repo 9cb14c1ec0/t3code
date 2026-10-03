@@ -2694,7 +2694,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
   useAutoReadAgentReplies({
     feed: props.feed,
     terminalAssistantMessageIds,
-    unsettledTurnId,
+    unsettledRunId: unsettledTurnId,
   });
 
   useEffect(() => {

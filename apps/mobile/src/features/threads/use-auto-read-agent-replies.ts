@@ -2,7 +2,7 @@ import { useAtomValue } from "@effect/atom-react";
 import { AsyncResult } from "effect/unstable/reactivity";
 import * as Speech from "expo-speech";
 import { useEffect, useRef } from "react";
-import type { TurnId } from "@t3tools/contracts";
+import type { RunId } from "@t3tools/contracts";
 
 import { markdownToSpeechText } from "../../lib/speechText";
 import type { ThreadFeedEntry } from "../../lib/threadActivity";
@@ -17,7 +17,7 @@ import { mobilePreferencesAtom } from "../../state/preferences";
 export function useAutoReadAgentReplies(input: {
   readonly feed: ReadonlyArray<ThreadFeedEntry>;
   readonly terminalAssistantMessageIds: ReadonlySet<string>;
-  readonly unsettledTurnId: TurnId | null;
+  readonly unsettledRunId: RunId | null;
 }) {
   const preferencesResult = useAtomValue(mobilePreferencesAtom);
   const enabled = AsyncResult.isSuccess(preferencesResult)
@@ -36,7 +36,7 @@ export function useAutoReadAgentReplies(input: {
         message.role !== "assistant" ||
         message.streaming ||
         !input.terminalAssistantMessageIds.has(message.id) ||
-        (input.unsettledTurnId !== null && message.turnId === input.unsettledTurnId) ||
+        (input.unsettledRunId !== null && message.runId === input.unsettledRunId) ||
         message.text.trim().length === 0
       ) {
         continue;
@@ -59,7 +59,7 @@ export function useAutoReadAgentReplies(input: {
         Speech.speak(markdownToSpeechText(message.text));
       }
     }
-  }, [enabled, input.feed, input.terminalAssistantMessageIds, input.unsettledTurnId]);
+  }, [enabled, input.feed, input.terminalAssistantMessageIds, input.unsettledRunId]);
 
   // Leaving the thread must not leave the narration running.
   useEffect(
