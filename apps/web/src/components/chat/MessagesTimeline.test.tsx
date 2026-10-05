@@ -263,7 +263,8 @@ beforeEach(stubDomGlobals);
 beforeAll(async () => {
   Object.defineProperty(window, "matchMedia", { value: matchMedia, configurable: true });
   ({ MessagesTimeline, resolvePreviewAnnotationImage } = await import("./MessagesTimeline"));
-}, 30_000);
+  // Cold-loading this module on the fork's 4-vCPU runner takes longer than 30s.
+}, 120_000);
 
 const ACTIVE_THREAD_ENVIRONMENT_ID = EnvironmentId.make("environment-local");
 const MESSAGE_CREATED_AT = "2026-03-17T19:12:28.000Z";

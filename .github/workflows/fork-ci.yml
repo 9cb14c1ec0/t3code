@@ -48,5 +48,14 @@ jobs:
       - name: Ensure Electron runtime is installed
         run: vp run --filter @t3tools/desktop ensure:electron
 
+      # Upstream gives web its own 8-vCPU runner. On this 4-vCPU runner the
+      # MessagesTimeline import exceeds its hook budget when every package
+      # transforms at once, so web and the server suite each get the machine.
       - name: Test
-        run: vp run test
+        run: vp run --parallel --concurrency-limit 2 --filter '!t3' --filter '!@t3tools/monorepo' --filter '!@t3tools/web' test
+
+      - name: Test web
+        run: vp run --filter @t3tools/web test
+
+      - name: Test server
+        run: vp run --filter t3 test
