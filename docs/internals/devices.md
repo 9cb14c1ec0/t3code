@@ -1,6 +1,6 @@
 # Devices
 
-The environment server owns simulators and emulators the way it owns
+The environment server owns simulators, emulators, and adb-attached Android devices the way it owns
 terminals: discovery, streaming, and agent access all run there, and every
 client reaches them through the environment connection. This is what makes the
 Device panel work over Tailscale and T3 Connect, including when an SSH host runs the devices.

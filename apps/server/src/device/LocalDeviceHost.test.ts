@@ -318,38 +318,34 @@ describe("Android SDK availability", () => {
     }),
   );
 
-  it.effect("explains that adb alone is insufficient to launch an emulator", () =>
+  it.effect("treats adb alone as enough for an attached device", () =>
     Effect.gen(function* () {
       const reason = yield* diagnose(["/sdk/platform-tools/adb"], { ANDROID_HOME: "/sdk" });
-      expect(reason).toContain("Android Emulator is missing");
+      expect(reason).toBeNull();
     }),
   );
 
-  it.effect("identifies command-line tools required by the device hub", () =>
+  it.effect("does not require the emulator or command-line tools when adb is installed", () =>
     Effect.gen(function* () {
       const reason = yield* diagnose(["/sdk/platform-tools/adb", "/sdk/emulator/emulator"], {
         ANDROID_HOME: "/sdk",
       });
-      expect(reason).toContain("Command-line Tools (latest) are missing");
+      expect(reason).toBeNull();
     }),
   );
 
-  it.effect("explains how to upgrade legacy command-line tools in the standard macOS SDK", () =>
+  it.effect("uses attached devices when only legacy command-line tools are installed", () =>
     Effect.gen(function* () {
       const root = "/test/home/Library/Android/sdk";
       const reason = yield* diagnose(
         [`${root}/platform-tools/adb`, `${root}/emulator/emulator`, `${root}/tools/bin/avdmanager`],
         { HOME: "/test/home" },
       );
-      expect(reason).toContain("older, unsupported version");
-      expect(reason).toContain(root);
-      expect(reason).toContain(
-        "Install Android SDK Command-line Tools (latest) in Android Studio's SDK Manager under SDK Tools.",
-      );
+      expect(reason).toBeNull();
     }),
   );
 
-  it.effect("recognizes legacy command-line tools on Windows", () =>
+  it.effect("uses attached devices when Windows has legacy command-line tools", () =>
     Effect.gen(function* () {
       const reason = yield* diagnose(
         [
@@ -360,7 +356,14 @@ describe("Android SDK availability", () => {
         { ANDROID_HOME: "C:\\Android\\Sdk" },
         "win32",
       );
-      expect(reason).toContain("older, unsupported version");
+      expect(reason).toBeNull();
+    }),
+  );
+
+  it.effect("explains that platform-tools are required to see an attached device", () =>
+    Effect.gen(function* () {
+      const reason = yield* diagnose(["/sdk/emulator/emulator"], { ANDROID_HOME: "/sdk" });
+      expect(reason).toContain("Platform-Tools");
     }),
   );
 

@@ -19,7 +19,7 @@ import { cn } from "~/lib/utils";
 const platformName = (platform: DevicePlatform) => (platform === "ios" ? "iOS" : "Android");
 
 export const deviceHubDescription =
-  "Enable this environment to open simulators and emulators, whether they run here or on a remote device host.";
+  "Enable this environment to open simulators, emulators, and Android devices attached with adb, whether they run here or on a remote device host.";
 export const agentDeviceDescription =
   "Allow new agent sessions in this environment to start and control local and remote devices, with required tools set up automatically.";
 
@@ -107,7 +107,7 @@ export function platformSetupStatus(state: DeviceServiceState, platform: DeviceP
       message:
         platform === "ios"
           ? "Xcode is installed, but no iOS Simulator is available. Install a runtime in Xcode Settings → Components."
-          : "The Android SDK is installed, but no virtual device exists. Create one in Android Studio → Device Manager.",
+          : "No Android device is connected and no virtual device was found. Connect a device with USB debugging enabled, or create one in Android Studio → Device Manager.",
     };
   }
   const remoteHost = supportingHosts.every((host) => host.kind !== "local")
@@ -121,7 +121,7 @@ export function platformSetupStatus(state: DeviceServiceState, platform: DeviceP
         ? `${remoteHost.label} starts iOS Simulators in the cloud with EAS Simulator.`
         : platform === "ios"
           ? `Xcode and iOS Simulator are available${location}.`
-          : `The Android SDK and Emulator are available${location}.`,
+          : `Android devices are available${location}.`,
   };
 }
 
@@ -161,10 +161,10 @@ export function DeviceSetup(props: {
     <>
       <WizardHeader
         title="Set up devices"
-        description="Review what runs on this environment before using simulators and emulators."
+        description="Review what runs on this environment before using simulators, emulators, and attached Android devices."
       >
         <WizardSteps
-          steps={["Device hub", "Simulators", "Agent access"]}
+          steps={["Device hub", "Devices", "Agent access"]}
           currentStep={step}
           onStepChange={setStep}
           isStepDisabled={(requested) => busy || pending !== null || requested > step}
