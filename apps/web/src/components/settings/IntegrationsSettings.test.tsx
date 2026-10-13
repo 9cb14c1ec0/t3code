@@ -144,9 +144,31 @@ const deviceState = (overrides: Partial<DeviceServiceState> = {}): DeviceService
 });
 
 describe("device setup guidance", () => {
-  it("directs users to install an iOS runtime and create an Android virtual device", () => {
+  it("directs users to install an iOS runtime or connect an Android device", () => {
     expect(platformSetupStatus(deviceState(), "ios").message).toContain("Xcode Settings");
-    expect(platformSetupStatus(deviceState(), "android").message).toContain("Device Manager");
+    const android = platformSetupStatus(deviceState(), "android").message;
+    expect(android).toContain("USB debugging");
+    expect(android).toContain("Device Manager");
+  });
+
+  it("treats a connected Android device as ready without an emulator", () => {
+    const state = deviceState({
+      devices: [
+        {
+          hostId: "local",
+          id: "R58N123ABC",
+          platform: "android",
+          name: "Pixel 7",
+          version: "Android",
+          booted: true,
+          physical: true,
+        },
+      ],
+    });
+    expect(platformSetupStatus(state, "android")).toEqual({
+      ready: true,
+      message: "Android devices are available.",
+    });
   });
 
   it("preserves a specific missing-tool explanation from the server", () => {

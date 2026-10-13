@@ -2,11 +2,12 @@
  * Device discovery, per-thread device sessions, and the state stream clients
  * render the Device panel from.
  *
- * Discovery and boot go through expo-device-hub's JSON API rather than
- * shelling out to simctl and adb here: the hub already normalizes both
- * platforms into one device shape and is the process that has to know a
- * device is booted before it can stream it. Sessions are the server's own
- * bookkeeping — which thread is looking at which device — so the panel and
+ * Discovery and boot go through expo-device-hub's JSON API. The hub returns
+ * an empty Android list when avdmanager fails, which hides a phone adb can
+ * already see, so Android is also read from `adb devices -l`. Stopped virtual
+ * devices still come from `emulator -list-avds` when that command works.
+ * Sessions are the server's own bookkeeping — which thread is looking at
+ * which device — so the panel and
  * the `device_*` tools agree, and so a `device_open` from an agent surfaces in
  * every connected client the way `preview_open` does.
  */
@@ -164,6 +165,27 @@ interface ServiceState {
 
 const vendorPrefix = (platform: DevicePlatform) =>
   platform === "ios" ? "/vendor/serve-sim" : "/vendor/serve-emu";
+
+/**
+ * Online rows from `adb devices -l`. A row is a serial, a state, then optional
+ * properties. Only state `device` can be opened. Unauthorized and offline
+ * serials are skipped, and a bare virtual-device name has no state, so it is
+ * not treated as a phone.
+ */
+const parseAdbDevices = (
+  stdout: string,
+): ReadonlyArray<{ readonly serial: string; readonly model: string | undefined }> => {
+  const found: Array<{ serial: string; model: string | undefined }> = [];
+  for (const line of stdout.split(/\r?\n/)) {
+    const match = /^(\S+)\s+(\S+)(?:\s+(.*))?$/.exec(line.trim());
+    if (!match) continue;
+    const serial = match[1];
+    if (!serial || match[2] !== "device") continue;
+    const model = /(?:^|\s)model:(\S+)/.exec(match[3] ?? "")?.[1];
+    found.push({ serial, model });
+  }
+  return found;
+};
 
 export const makeWithHosts = Effect.fn("DeviceService.makeWithHosts")(function* (
   hosts: ReadonlyMap<DeviceHostId, DeviceHost.DeviceHost["Service"]>,
@@ -397,29 +419,60 @@ export const makeWithHosts = Effect.fn("DeviceService.makeWithHosts")(function* 
     const devices = [...list.simulators, ...list.emulators].map(toSummary);
     const host = yield* resolveHost(ready.hostId);
     if ((yield* host.platformAvailability("android")).available) {
-      const avds = yield* ready.run("emulator", ["-list-avds"]);
-      if (avds.code !== 0) {
-        return yield* new DeviceOperationError({
-          operation: "list",
-          reason: "command_failed",
-          exitCode: avds.code,
-          cause: avds,
-        });
-      }
-      for (const name of avds.stdout
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter(Boolean)) {
-        if (!devices.some((device) => device.platform === "android" && device.name === name)) {
+      const attached = yield* ready.run("adb", ["devices", "-l"]);
+      if (attached.code === 0) {
+        for (const device of parseAdbDevices(attached.stdout)) {
+          const physical = !device.serial.startsWith("emulator-");
+          const index = devices.findIndex((existing) => existing.id === device.serial);
+          if (index >= 0) {
+            const existing = devices[index];
+            // The hub can remember a phone as stopped. adb is the live state,
+            // and booting that serial would try to launch an emulator.
+            if (existing?.platform === "android" && !existing.booted) {
+              devices[index] = {
+                ...existing,
+                booted: true,
+                physical: existing.physical || physical,
+              };
+            }
+            continue;
+          }
+          const model = device.model?.replace(/_/g, " ");
           devices.push({
             hostId: ready.hostId,
-            id: name,
-            name,
+            id: device.serial,
+            name: model || device.serial,
             platform: "android",
             version: "Android",
-            booted: false,
-            physical: false,
+            booted: true,
+            physical,
           });
+        }
+      }
+      // A missing emulator binary is normal on a machine that only has a
+      // phone. Keep the adb devices instead of failing the refresh.
+      const avds = yield* ready.run("emulator", ["-list-avds"]);
+      if (avds.code === 0) {
+        for (const name of avds.stdout
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter(Boolean)) {
+          if (
+            !devices.some(
+              (device) =>
+                device.platform === "android" && (device.id === name || device.name === name),
+            )
+          ) {
+            devices.push({
+              hostId: ready.hostId,
+              id: name,
+              name,
+              platform: "android",
+              version: "Android",
+              booted: false,
+              physical: false,
+            });
+          }
         }
       }
     }
@@ -741,6 +794,14 @@ export const makeWithHosts = Effect.fn("DeviceService.makeWithHosts")(function* 
     deviceId: DeviceId,
     platform: DevicePlatform,
   ) {
+    const known = findDevice((yield* SynchronizedRef.get(stateRef)).state, hostId, deviceId);
+    if (known?.physical) {
+      return yield* new DeviceOperationError({
+        operation: "shutdown",
+        reason: "physical_device",
+        cause: deviceId,
+      });
+    }
     const ready = yield* readiness(hostId);
     const postShutdown = (path: string, body: Record<string, string>) =>
       HttpClientRequest.post(`${ready.hub.origin}${path}`).pipe(
@@ -810,6 +871,21 @@ export const makeWithHosts = Effect.fn("DeviceService.makeWithHosts")(function* 
           (input.deviceId === undefined || session.deviceId === input.deviceId),
       );
       if (closing.length === 0) return;
+      if (
+        input.shutdown &&
+        closing.some((session) =>
+          state.devices.some(
+            (device) =>
+              device.physical && device.hostId === session.hostId && device.id === session.deviceId,
+          ),
+        )
+      ) {
+        return yield* new DeviceOperationError({
+          operation: "shutdown",
+          reason: "physical_device",
+          cause: "Physical Android devices stay on.",
+        });
+      }
       yield* publish((current) => ({
         ...current,
         sessions: current.sessions.filter((session) => !closing.includes(session)),

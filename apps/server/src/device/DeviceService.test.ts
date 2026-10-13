@@ -69,6 +69,15 @@ const fixture = Effect.fn("fixture")(function* (
   runtimeFailure?: NodeRuntimeUnavailableError | DeviceHost.DeviceHostError,
   inspectError = false,
   installTool?: Parameters<typeof DeviceService.makeWithHosts>[3],
+  run: DeviceHost.DeviceHostReady["run"] = () =>
+    Effect.succeed({ code: 0, stdout: "Pixel_API_35\n", stderr: "" }),
+  initialEmulators: ReadonlyArray<{
+    readonly id: string;
+    readonly name: string;
+    readonly version: string;
+    readonly booted: boolean;
+    readonly physical: boolean;
+  }> = [],
 ) {
   const settings = yield* Ref.make(DEFAULT_SERVER_SETTINGS);
   const starts: string[] = [];
@@ -81,7 +90,7 @@ const fixture = Effect.fn("fixture")(function* (
     nodePath: process.execPath,
     hub: { origin: "http://device.test" },
     helpers: { serveSimAxSettings: null, serveSimCli: null },
-    run: () => Effect.succeed({ code: 0, stdout: "Pixel_API_35\n", stderr: "" }),
+    run,
   };
   const host: DeviceHost.DeviceHost["Service"] = {
     ...(inspectError
@@ -195,18 +204,21 @@ const fixture = Effect.fn("fixture")(function* (
             request,
             Response.json({
               simulators: [],
-              emulators: booted
-                ? [
-                    {
-                      id: "emulator-5554",
-                      name: "Pixel_API_35",
-                      platform: "android",
-                      version: "Android 15",
-                      booted: true,
-                      physical: false,
-                    },
-                  ]
-                : [],
+              emulators: [
+                ...initialEmulators.map((device) => ({ ...device, platform: "android" as const })),
+                ...(booted
+                  ? [
+                      {
+                        id: "emulator-5554",
+                        name: "Pixel_API_35",
+                        platform: "android" as const,
+                        version: "Android 15",
+                        booted: true,
+                        physical: false,
+                      },
+                    ]
+                  : []),
+              ],
             }),
           );
         }),
@@ -300,6 +312,106 @@ describe("device setup consent", () => {
       const state = yield* service.state;
       expect(state.devices.map((device) => device.id)).toEqual(["emulator-5554"]);
       expect(state.bootingDevices).toEqual([]);
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect(
+    "lists adb-attached Android devices without an emulator and does not boot or power them off",
+    () =>
+      Effect.gen(function* () {
+        const adb = [
+          "List of devices attached",
+          "R58N123ABC             device usb:1-1 product:a52xq model:SM_A525F device:a52q transport_id:2",
+          "192.168.1.20:5555      device product:panther model:Pixel_7 device:panther transport_id:3",
+          "emulator-5554          device product:sdk_gphone64_arm64 model:sdk_gphone64_arm64 device:emu64a",
+          "ABCD                   unauthorized",
+          "WXYZ                   offline",
+          "* daemon started successfully",
+        ].join("\n");
+        const { service, requests } = yield* fixture(
+          Effect.void,
+          undefined,
+          false,
+          undefined,
+          false,
+          undefined,
+          (command) =>
+            Effect.succeed(
+              command === "adb"
+                ? { code: 0, stdout: adb, stderr: "" }
+                : { code: 1, stdout: "", stderr: "emulator missing" },
+            ),
+        );
+        const state = yield* service.configure({ enabled: true });
+        expect(
+          state.devices.map((device) => [device.id, device.name, device.physical, device.booted]),
+        ).toEqual([
+          ["R58N123ABC", "SM A525F", true, true],
+          ["192.168.1.20:5555", "Pixel 7", true, true],
+          ["emulator-5554", "sdk gphone64 arm64", false, true],
+        ]);
+        const threadId = ThreadId.make("phone");
+        const session = yield* service.open({
+          threadId,
+          deviceId: "R58N123ABC",
+          platform: "android",
+        });
+        expect(session.deviceId).toBe("R58N123ABC");
+        expect(requests.some((url) => url.endsWith("/boot"))).toBe(false);
+        const closed = yield* service
+          .close({ threadId, deviceId: "R58N123ABC", shutdown: true })
+          .pipe(Effect.flip);
+        expect(closed.message).toContain("stays on");
+        expect((yield* service.state).sessions).toHaveLength(1);
+        const poweredOff = yield* service
+          .shutdown({ deviceId: "R58N123ABC", platform: "android" })
+          .pipe(Effect.flip);
+        expect(poweredOff.message).toContain("stays on");
+        expect(requests.some((url) => url.includes("shutdown"))).toBe(false);
+        expect((yield* service.state).sessions).toHaveLength(1);
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect("treats a hub-stopped serial as connected when adb still lists it", () =>
+    Effect.gen(function* () {
+      const { service, requests } = yield* fixture(
+        Effect.void,
+        undefined,
+        false,
+        undefined,
+        false,
+        undefined,
+        (command) =>
+          Effect.succeed(
+            command === "adb"
+              ? {
+                  code: 0,
+                  stdout: "R58N123ABC device usb:1-1 model:Pixel_7 device:panther\n",
+                  stderr: "",
+                }
+              : { code: 1, stdout: "", stderr: "emulator missing" },
+          ),
+        [
+          {
+            id: "R58N123ABC",
+            name: "Phone",
+            version: "Android 14",
+            booted: false,
+            physical: true,
+          },
+        ],
+      );
+      const state = yield* service.configure({ enabled: true });
+      expect(
+        state.devices.map((device) => [device.id, device.name, device.physical, device.booted]),
+      ).toEqual([["R58N123ABC", "Phone", true, true]]);
+      const session = yield* service.open({
+        threadId: ThreadId.make("remembered-phone"),
+        deviceId: "R58N123ABC",
+        platform: "android",
+      });
+      expect(session.deviceId).toBe("R58N123ABC");
+      expect(requests.some((url) => url.endsWith("/boot"))).toBe(false);
     }).pipe(Effect.scoped),
   );
 

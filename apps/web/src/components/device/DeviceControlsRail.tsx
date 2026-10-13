@@ -47,6 +47,8 @@ export function DeviceControlsRail(props: {
   onFloat: () => void;
   onClose: () => void;
   onPowerOff: () => void;
+  /** Connected phones and tablets stay on; power off is for simulators and emulators. */
+  allowPowerOff: boolean;
 }) {
   const { view, handle, controls } = props;
   const popupSide = "left";
@@ -217,11 +219,15 @@ export function DeviceControlsRail(props: {
               <X />
               Close device panel
             </MenuItem>
-            <MenuSeparator />
-            <MenuItem variant="destructive" onClick={props.onPowerOff}>
-              <Power />
-              Power off device
-            </MenuItem>
+            {props.allowPowerOff ? (
+              <>
+                <MenuSeparator />
+                <MenuItem variant="destructive" onClick={props.onPowerOff}>
+                  <Power />
+                  Power off device
+                </MenuItem>
+              </>
+            ) : null}
           </MenuPopup>
         </Menu>
         <RailDivider />
