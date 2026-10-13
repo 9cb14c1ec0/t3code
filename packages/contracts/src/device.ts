@@ -1,5 +1,5 @@
 /**
- * Device - Schemas for first-class iOS Simulator and Android Emulator support.
+ * Device - Schemas for iOS Simulator, Android Emulator, and adb-attached Android device support.
  *
  * The server owns device discovery, the streaming helper (expo-device-hub),
  * and the agent driver (agent-device). Clients render the live screen from the
@@ -425,6 +425,7 @@ export class DeviceOperationError extends Schema.TaggedError<DeviceOperationErro
       "invalid_payload",
       "settings_failed",
       "hub_rejected",
+      "physical_device",
     ]),
     exitCode: Schema.optional(Schema.Number),
     cause: Schema.Defect(),
@@ -437,6 +438,8 @@ export class DeviceOperationError extends Schema.TaggedError<DeviceOperationErro
       invalid_payload: "The device request could not be encoded.",
       settings_failed: "Could not read or save device settings.",
       hub_rejected: "The device hub could not complete the request.",
+      physical_device:
+        "A connected Android device stays on. Disconnect it instead of powering it off.",
     }[this.reason];
     return `Device ${this.operation} failed: ${explanation}`;
   }
@@ -447,13 +450,15 @@ export class DeviceActionUnavailableError extends Schema.TaggedError<DeviceActio
   {
     operation: Schema.String,
     platform: DevicePlatform,
-    reason: Schema.Literals(["unsupported", "helper_missing"]),
+    reason: Schema.Literals(["unsupported", "helper_missing", "emulator_only"]),
   },
 ) {
   override get message(): string {
     return this.reason === "helper_missing"
       ? `Device ${this.operation} requires a helper missing from this install. Set up device support again.`
-      : `Device ${this.operation} is not supported on ${this.platform}.`;
+      : this.reason === "emulator_only"
+        ? `Device ${this.operation} only works on an Android emulator.`
+        : `Device ${this.operation} is not supported on ${this.platform}.`;
   }
 }
 
@@ -543,7 +548,8 @@ export const DeviceToolCloseInput = Schema.Struct({
   hostId: Schema.optional(DeviceHostId),
   shutdown: Schema.optional(
     Schema.Boolean.annotate({
-      description: "Also power the simulator or emulator off. Defaults to false.",
+      description:
+        "Also power off a simulator or emulator. A connected Android device stays on. Defaults to false.",
     }),
   ),
 });

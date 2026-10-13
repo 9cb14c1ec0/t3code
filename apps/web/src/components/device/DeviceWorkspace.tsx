@@ -109,6 +109,7 @@ export function DeviceWorkspace(props: {
                 onFloat={props.onFloat}
                 onClose={props.onClose}
                 onPowerOff={props.onPowerOff}
+                allowPowerOff={!props.device.physical}
               />
             )}
           />

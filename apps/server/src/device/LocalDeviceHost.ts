@@ -127,13 +127,9 @@ const platformReason = Effect.fn("LocalDeviceHost.platformReason")(function* (
     return "Android SDK was not found. Install it with Android Studio or set ANDROID_HOME to your SDK directory.";
   if (!sdk.adb)
     return `Android SDK Platform-Tools are missing from ${sdk.root}. Install them in Android Studio's SDK Manager.`;
-  if (!sdk.emulator)
-    return `Android Emulator is missing from ${sdk.root}. Install it in Android Studio's SDK Manager.`;
-  if (!sdk.avdmanager) {
-    if (sdk.legacyAvdmanager)
-      return `The Android SDK command-line tools in ${sdk.root} appear to be an older, unsupported version. Install Android SDK Command-line Tools (latest) in Android Studio's SDK Manager under SDK Tools.`;
-    return `Android SDK Command-line Tools (latest) are missing from ${sdk.root}. Install them in Android Studio's SDK Manager.`;
-  }
+  // A phone or tablet only needs adb. The emulator and avdmanager are used
+  // later, when a virtual device is booted, and a missing one must not hide
+  // a device that `adb devices` can already see.
   return null;
 });
 
@@ -173,25 +169,11 @@ const androidSdk = Effect.gen(function* () {
     const emulator = yield* exists(
       path.join(root, "emulator", platform === "win32" ? "emulator.exe" : "emulator"),
     );
-    if (explicit || adb || emulator) {
-      const avdmanager = yield* exists(
-        path.join(
-          root,
-          "cmdline-tools",
-          "latest",
-          "bin",
-          platform === "win32" ? "avdmanager.bat" : "avdmanager",
-        ),
-      );
-      const legacyAvdmanager =
-        !avdmanager &&
-        (yield* exists(
-          path.join(root, "tools", "bin", platform === "win32" ? "avdmanager.bat" : "avdmanager"),
-        ));
-      return { root, adb, emulator, avdmanager, legacyAvdmanager };
-    }
+    // The emulator binary alone still identifies an SDK, so a machine with no
+    // adb can explain that Platform-Tools are missing instead of "no SDK".
+    if (explicit || adb || emulator) return { root, adb };
   }
-  return { root: null, adb: false, emulator: false, avdmanager: false, legacyAvdmanager: false };
+  return { root: null, adb: false };
 });
 
 const deviceHostEnvironment = (

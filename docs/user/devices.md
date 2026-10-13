@@ -1,9 +1,10 @@
 # Devices
 
-The Device panel shows a live iOS Simulator or Android Emulator next to a
-thread, so you can watch an agent verify mobile work and tap the device
-yourself. Agents get the same device through `device_*` tools and the
-`agent-device` command line, which T3 Code sets up for them.
+The Device panel shows a live iOS Simulator, Android Emulator, or Android
+device attached with adb next to a thread, so you can watch an agent verify
+mobile work and tap the device yourself. Agents get the same device through
+`device_*` tools and the `agent-device` command line, which T3 Code sets up
+for them.
 
 ## Open a device
 
@@ -23,21 +24,25 @@ device in a small window while the right panel shows something else; drag the
 window by its handle, resize it from any edge, and use **Open in right panel**
 to bring it back.
 Turn off the device hub in **Settings → Integrations → Devices** to stop the
-helper processes; simulators and emulators keep running until you power them
-off.
+helper processes. Simulators and emulators keep running until you power them
+off. An attached Android device stays on.
 
-Simulators run on the machine that hosts the environment server. iOS needs
-macOS with Xcode. Android needs the SDK Platform-Tools, Android Emulator,
-and Command-line Tools (latest), plus a virtual device created in Android
+Simulators and attached devices run on the machine that hosts the environment
+server. iOS needs macOS with Xcode. An Android phone or tablet needs SDK
+Platform-Tools so `adb devices` lists it as `device`. Enable USB debugging and
+accept the computer's authorization prompt on the device. A wireless device
+that `adb` lists the same way works too. Virtual devices also need the Android
+Emulator, Command-line Tools (latest), and a virtual device created in Android
 Studio's Device Manager. T3 Code detects standard SDK locations; set
 `ANDROID_HOME` for a custom location. The panel explains missing dependencies.
 After installing them, restart the environment server and refresh devices.
 
 The screen is interactive: click and drag to touch, type while the screen is
-focused, and use the toolbar for Home, Back, and Recents on Android, rotate on
-iOS, and power off. Close the tab to stop watching; the device keeps running
-unless you power it off. Closed tabs stay closed after a reload. To watch the
-device again, choose it from **+ → Device**.
+focused, and use the toolbar for Home, Back, and Recents on Android and rotate
+on iOS. Power off is available for a simulator or emulator. Close the tab to
+stop watching; the device keeps running. A connected Android device stays on.
+Closed tabs stay closed after a reload. To watch the device again, choose it
+from **+ → Device**.
 
 Choose **3D view** to inspect supported devices while the live screen stays
 interactive. On iPhone Duo, use the fold and stance controls to change its
