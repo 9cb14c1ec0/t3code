@@ -36,7 +36,10 @@ import { DeviceWorkspace } from "./DeviceWorkspace";
 import { PreviewPanelShell, type PreviewPanelMode } from "../preview/PreviewPanelShell";
 
 const platformLabel = (platform: DevicePlatform) =>
-  platform === "ios" ? "iOS Simulators" : "Android Emulators";
+  platform === "ios" ? "iOS Simulators" : "Android";
+
+const deviceStatusLabel = (device: DeviceSummary) =>
+  device.physical && device.booted ? "Connected" : device.booted ? "Running" : "Stopped";
 
 const deviceKey = (device: Pick<DeviceSummary, "hostId" | "id">) =>
   `${device.hostId}\u0000${device.id}`;
@@ -281,7 +284,7 @@ export function DevicePanel(props: {
                     >
                       {state.hostStatus === "failed"
                         ? (state.hostStatusDetail ?? "The device hub failed to start.")
-                        : "No simulators or emulators were found on this environment."}
+                        : "No simulators, emulators, or attached devices were found on this environment."}
                     </p>
                   </>
                 ) : null}
@@ -307,7 +310,7 @@ export function DevicePanel(props: {
                                   {device.name}
                                 </span>
                                 <span className="truncate text-xs text-muted-foreground">
-                                  {`${state.hosts.find((host) => host.id === device.hostId)?.label} · ${device.version} · ${device.booted ? "Running" : "Stopped"}`}
+                                  {`${state.hosts.find((host) => host.id === device.hostId)?.label} · ${device.version} · ${deviceStatusLabel(device)}`}
                                 </span>
                               </div>
                               <Button
@@ -338,8 +341,8 @@ export function DevicePanel(props: {
                 !state.devices.some((device) => device.platform === "android") &&
                 !unavailablePlatforms.some((platform) => platform.platform === "android") ? (
                   <p className="max-w-sm text-xs">
-                    No Android virtual devices found. Create one in Android Studio's Device Manager,
-                    then refresh.
+                    No Android devices found. Connect a device with USB debugging enabled, or create
+                    one in Android Studio's Device Manager, then refresh.
                   </p>
                 ) : null}
                 {loaded && !hostBusy ? (

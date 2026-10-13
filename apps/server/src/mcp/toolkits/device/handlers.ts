@@ -99,7 +99,7 @@ const pickDevice = Effect.fn("handlers.pickDevice")(function* (
     return yield* new DeviceToolUnavailableError({
       reason:
         input.platform === undefined
-          ? "No simulators or emulators were found. Call device_list to see why."
+          ? "No simulators, emulators, or attached devices were found. Call device_list to see why."
           : `No ${input.platform} devices were found on host ${hostId}. Call device_list to see why.`,
     });
   }

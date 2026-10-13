@@ -408,6 +408,13 @@ const runAndroid = Effect.fn("DeviceActions.runAndroid")(function* (
       return;
     }
     case "setLocation":
+      if (!serial.startsWith("emulator-")) {
+        return yield* new DeviceActionUnavailableError({
+          operation: "location",
+          platform: "android",
+          reason: "emulator_only",
+        });
+      }
       yield* adb(
         run,
         serial,
