@@ -42,6 +42,21 @@ const HubActionResult = Schema.Struct({
 const vendorPrefix = (platform: DevicePlatform) =>
   platform === "ios" ? "/vendor/serve-sim" : "/vendor/serve-emu";
 
+const parseAdbDevices = (
+  stdout: string,
+): ReadonlyArray<{ readonly serial: string; readonly model: string | undefined }> => {
+  const found: Array<{ serial: string; model: string | undefined }> = [];
+  for (const line of stdout.split(/\r?\n/)) {
+    const match = /^(\S+)\s+(\S+)(?:\s+(.*))?$/.exec(line.trim());
+    if (!match) continue;
+    const serial = match[1];
+    if (!serial || match[2] !== "device") continue;
+    const model = /(?:^|\s)model:(\S+)/.exec(match[3] ?? "")?.[1];
+    found.push({ serial, model });
+  }
+  return found;
+};
+
 /** Device operations for a host that runs expo-device-hub at `origin`. */
 export const makeDeviceHubOperations = (options: {
   readonly hostId: DeviceHostId;
@@ -109,6 +124,33 @@ export const makeDeviceHubOperations = (options: {
     const details = warnings?.map((error) => error.message) ?? [];
     let androidDiscoveryIncomplete = false;
     if (yield* options.androidAvailable) {
+      const attached = yield* run("adb", ["devices", "-l"]);
+      if (attached.code === 0) {
+        for (const device of parseAdbDevices(attached.stdout)) {
+          const physical = !device.serial.startsWith("emulator-");
+          const index = devices.findIndex((existing) => existing.id === device.serial);
+          if (index >= 0) {
+            const existing = devices[index];
+            // adb is authoritative when the hub remembers a connected phone as stopped.
+            if (existing?.platform === "android" && !existing.booted) {
+              devices[index] = {
+                ...existing,
+                booted: true,
+                physical: existing.physical || physical,
+              };
+            }
+            continue;
+          }
+          devices.push({
+            id: device.serial,
+            name: device.model?.replace(/_/g, " ") || device.serial,
+            platform: "android",
+            version: "Android",
+            booted: true,
+            physical,
+          });
+        }
+      }
       const avds = yield* run("emulator", ["-list-avds"]);
       // Discovered devices stay listed; the AVDs that could not be listed are a warning.
       if (avds.code !== 0) {

@@ -121,13 +121,9 @@ const platformReason = Effect.fn("LocalDeviceHost.platformReason")(function* (
     return "Android SDK was not found. Install it with Android Studio or set ANDROID_HOME to your SDK directory.";
   if (!sdk.adb)
     return `Android SDK Platform-Tools are missing from ${sdk.root}. Install them in Android Studio's SDK Manager.`;
-  if (!sdk.emulator)
-    return `Android Emulator is missing from ${sdk.root}. Install it in Android Studio's SDK Manager.`;
-  if (!sdk.avdmanager) {
-    if (sdk.legacyAvdmanager)
-      return `The Android SDK command-line tools in ${sdk.root} appear to be an older, unsupported version. Install Android SDK Command-line Tools (latest) in Android Studio's SDK Manager under SDK Tools.`;
-    return `Android SDK Command-line Tools (latest) are missing from ${sdk.root}. Install them in Android Studio's SDK Manager.`;
-  }
+  // A phone or tablet only needs adb. The emulator and avdmanager are used
+  // later, when a virtual device is booted, and a missing one must not hide
+  // a device that `adb devices` can already see.
   return null;
 });
 
@@ -141,19 +137,13 @@ const androidSdk = Effect.gen(function* () {
   const explicit = environment.ANDROID_HOME?.trim() || environment.ANDROID_SDK_ROOT?.trim();
   const exists = (file: string) => fs.exists(file).pipe(Effect.orElseSucceed(() => false));
   const adbBinary = windows ? "adb.exe" : "adb";
-  const avdmanagerBinary = windows ? "avdmanager.bat" : "avdmanager";
   const inspect = Effect.fnUntraced(function* (root: string) {
     const adb = yield* exists(path.join(root, "platform-tools", adbBinary));
     const emulator = yield* exists(
       path.join(root, "emulator", windows ? "emulator.exe" : "emulator"),
     );
     if (!explicit && !adb && !emulator) return null;
-    const avdmanager = yield* exists(
-      path.join(root, "cmdline-tools", "latest", "bin", avdmanagerBinary),
-    );
-    const legacyAvdmanager =
-      !avdmanager && (yield* exists(path.join(root, "tools", "bin", avdmanagerBinary)));
-    return { root, adb, emulator, avdmanager, legacyAvdmanager };
+    return { root, adb };
   });
   const candidates = explicit
     ? [explicit]
@@ -182,7 +172,7 @@ const androidSdk = Effect.gen(function* () {
       if (sdk) return sdk;
     }
   }
-  return { root: null, adb: false, emulator: false, avdmanager: false, legacyAvdmanager: false };
+  return { root: null, adb: false };
 });
 
 const deviceHostEnvironment = (

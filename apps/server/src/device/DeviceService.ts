@@ -696,6 +696,14 @@ export const makeWithHosts = Effect.fn("DeviceService.makeWithHosts")(function* 
     deviceId: DeviceId,
     platform: DevicePlatform,
   ) {
+    const known = findDevice((yield* SynchronizedRef.get(stateRef)).state, hostId, deviceId);
+    if (known?.physical) {
+      return yield* new DeviceOperationError({
+        operation: "shutdown",
+        reason: "physical_device",
+        cause: deviceId,
+      });
+    }
     const ready = yield* readiness(hostId);
     yield* ready.devices.shutdown({ id: deviceId, platform });
     yield* publish((state) => ({
@@ -728,6 +736,21 @@ export const makeWithHosts = Effect.fn("DeviceService.makeWithHosts")(function* 
           (input.deviceId === undefined || session.deviceId === input.deviceId),
       );
       if (closing.length === 0) return;
+      if (
+        input.shutdown &&
+        closing.some((session) =>
+          state.devices.some(
+            (device) =>
+              device.physical && device.hostId === session.hostId && device.id === session.deviceId,
+          ),
+        )
+      ) {
+        return yield* new DeviceOperationError({
+          operation: "shutdown",
+          reason: "physical_device",
+          cause: "Physical Android devices stay on.",
+        });
+      }
       yield* publish((current) => ({
         ...current,
         sessions: current.sessions.filter((session) => !closing.includes(session)),
