@@ -28,7 +28,7 @@ const DeviceToolFailure = Schema.Union([DeviceToolError, OrchestratorMcpFailure]
 
 const DeviceListTool = Tool.make("device_list", {
   description:
-    "List iOS Simulators and Android Emulators on this environment's device hosts, which platforms each host can run, and which devices are already open in this thread's Device panel. Call this before device_open when you do not know a device id.",
+    "List iOS Simulators, Android Emulators, and adb-attached Android devices on this environment's device hosts, which platforms each host can run, and which devices are already open in this thread's Device panel. Call this before device_open when you do not know a device id.",
   // An empty struct serializes as `anyOf [object, array]`, which some
   // providers reject and then drop every tool on the server with it.
   parameters: Schema.Struct({
@@ -48,7 +48,7 @@ const DeviceListTool = Tool.make("device_list", {
 
 const DeviceOpenTool = Tool.make("device_open", {
   description:
-    "Open a simulator or emulator for this thread: boots it if needed, starts its live stream, and shows it in the user's Device panel so they can watch. Returns the agent-device CLI invocation pinned to the device; drive the device with that CLI afterwards.",
+    "Open a simulator, emulator, or adb-attached Android device for this thread. A stopped virtual device boots first; a connected phone or tablet is already on. Starts its live stream and shows it in the user's Device panel so they can watch. Returns the agent-device CLI invocation pinned to the device; drive the device with that CLI afterwards.",
   parameters: DeviceToolOpenInput,
   success: DeviceToolOpenResult,
   failure: DeviceToolFailure,
@@ -76,7 +76,7 @@ export const DeviceScreenshotTool = Tool.make("device_screenshot", {
 
 const DeviceCloseTool = Tool.make("device_close", {
   description:
-    "Remove a device from this thread's Device panel. Pass shutdown=true to also power the simulator or emulator off.",
+    "Remove a device from this thread's Device panel. Pass shutdown=true to power off a simulator or emulator. A connected Android device stays on.",
   parameters: DeviceToolCloseInput,
   success: Schema.Record(Schema.String, Schema.Never).annotate({
     description: "The device was closed.",

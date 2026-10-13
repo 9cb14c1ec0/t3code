@@ -12,7 +12,7 @@ export function threadDevicePreviews(state: DeviceServiceState | null, threadId:
       return {
         key: JSON.stringify([session.hostId, session.deviceId]),
         session,
-        name: device?.name ?? (session.platform === "ios" ? "iOS Simulator" : "Android Emulator"),
+        name: device?.name ?? (session.platform === "ios" ? "iOS Simulator" : "Android device"),
         description: [device?.version, host?.label].filter(Boolean).join(" · "),
       };
     });
