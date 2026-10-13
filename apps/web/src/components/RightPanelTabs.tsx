@@ -403,7 +403,7 @@ function RightPanelEmptyState(props: {
     },
     {
       label: "Device",
-      description: "Watch an iOS Simulator or Android Emulator.",
+      description: "Watch an iOS Simulator or Android device.",
       icon: Smartphone,
       shortcut: "M",
       available: props.deviceAvailable,

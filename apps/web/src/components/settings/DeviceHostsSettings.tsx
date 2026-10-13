@@ -86,7 +86,7 @@ export function DeviceHostsSettings(props: { environmentId: EnvironmentId | null
       title="Device hosts"
       serverScoped
       settingKeys={["deviceHosts"]}
-      description="Add remote machines with simulator or emulator runtimes installed, and the selected environments will connect over SSH and set up device tools automatically."
+      description="Add remote machines with Xcode, an Android emulator, or adb, and the selected environments will connect over SSH and set up device tools automatically."
       control={
         <Button
           size="sm"

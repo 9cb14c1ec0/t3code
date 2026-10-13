@@ -128,6 +128,31 @@ describe("runDeviceAction", () => {
       }),
   );
 
+  it.effect("sets a fake location on an emulator and refuses it on a physical device", () =>
+    Effect.gen(function* () {
+      const emulator = makeReady();
+      yield* runDeviceAction(emulator.ready, "android", {
+        type: "setLocation",
+        deviceId: "emulator-5554",
+        latitude: 1,
+        longitude: 2,
+      });
+      expect(emulator.calls).toEqual([
+        { command: "adb", args: ["-s", "emulator-5554", "emu", "geo", "fix", "2", "1"] },
+      ]);
+      const phone = makeReady();
+      const error = yield* runDeviceAction(phone.ready, "android", {
+        type: "setLocation",
+        deviceId: "R5CT1234",
+        latitude: 1,
+        longitude: 2,
+      }).pipe(Effect.flip);
+      expect(error._tag).toBe("DeviceActionUnavailableError");
+      expect(error.message).toContain("emulator");
+      expect(phone.calls).toEqual([]);
+    }),
+  );
+
   it.effect("runs accessibility toggles through the bundled helper via simctl spawn", () =>
     Effect.gen(function* () {
       const { ready, calls } = makeReady();

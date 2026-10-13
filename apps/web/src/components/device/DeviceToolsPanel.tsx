@@ -291,12 +291,14 @@ export function DeviceToolsPanel(props: {
           />
         </Section>
 
-        <LocationSection
-          disabled={disabled}
-          canClear={isIos}
-          onSet={(latitude, longitude) => act({ type: "setLocation", latitude, longitude })}
-          onClear={() => act({ type: "clearLocation" })}
-        />
+        {device.platform === "android" && device.physical ? null : (
+          <LocationSection
+            disabled={disabled}
+            canClear={isIos}
+            onSet={(latitude, longitude) => act({ type: "setLocation", latitude, longitude })}
+            onClear={() => act({ type: "clearLocation" })}
+          />
+        )}
 
         <PermissionsSection
           permissions={isIos ? IOS_PERMISSIONS : ANDROID_PERMISSIONS}
