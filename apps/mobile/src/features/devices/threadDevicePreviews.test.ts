@@ -94,7 +94,7 @@ describe("thread device previews", () => {
 
   it("can view an open session before device discovery metadata arrives", () => {
     const previews = threadDevicePreviews({ ...state, hosts: [], devices: [] }, threadId);
-    expect(previews[0]?.name).toBe("Android Emulator");
+    expect(previews[0]?.name).toBe("Android device");
     expect(previews[0]?.session.deviceId).toBe("emulator-5554");
     expect(previews[0]?.description).toBe("");
   });
