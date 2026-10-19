@@ -61,6 +61,7 @@ function downloadedState(overrides: Partial<DesktopUpdateState> = {}): DesktopUp
 
 describe("showDesktopUpdateDownloadedToast", () => {
   beforeEach(() => {
+    vi.stubEnv("T3CODE_DESKTOP_UPDATE_REPOSITORY", undefined);
     testState.addToast.mockReset();
   });
 
