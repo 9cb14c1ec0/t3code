@@ -1037,9 +1037,7 @@ export function useThreadOutboxDrain(): void {
           worktreePath: workspace.worktreePath,
           startFromOrigin: workspace.startFromOrigin ?? false,
           worktreeBranchName: buildTemporaryWorktreeBranchName(randomHex, {
-            omitPrefix:
-              serverConfigs.get(queuedMessage.environmentId)?.settings?.omitT3CodeBranchPrefix ===
-              true,
+            omitPrefix: currentConfig.settings?.omitT3CodeBranchPrefix === true,
           }),
         }),
       });
