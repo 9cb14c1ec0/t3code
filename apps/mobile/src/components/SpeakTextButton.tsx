@@ -1,5 +1,5 @@
 import * as Speech from "expo-speech";
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, type ColorValue } from "react-native";
 
 import { markdownToSpeechText } from "../lib/speechText";
@@ -19,20 +19,19 @@ export const SpeakTextButton = memo(function SpeakTextButton(props: {
   const [speaking, setSpeaking] = useState(false);
   const speakingRef = useRef(false);
 
-  const stop = () => {
+  const stop = useCallback(() => {
     if (speakingRef.current) {
       speakingRef.current = false;
       activeStop = null;
       setSpeaking(false);
       void Speech.stop();
     }
-  };
-  const stopRef = useRef(stop);
-  stopRef.current = stop;
+  }, []);
 
   // Unmount while speaking (navigation away, feed recycling) must not leave
   // the engine talking with no visible way to stop it.
-  useEffect(() => () => stopRef.current(), []);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- Stop the external speech engine when this virtualized button unmounts.
+  useEffect(() => stop, [stop]);
 
   const onPress = () => {
     if (speakingRef.current) {
@@ -48,7 +47,7 @@ export const SpeakTextButton = memo(function SpeakTextButton(props: {
       }
     };
     speakingRef.current = true;
-    activeStop = () => stopRef.current();
+    activeStop = stop;
     setSpeaking(true);
     Speech.speak(markdownToSpeechText(props.text), {
       onDone: settle,

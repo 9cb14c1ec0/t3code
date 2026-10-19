@@ -10,7 +10,7 @@ import { mobilePreferencesAtom } from "../../state/preferences";
 
 /**
  * Speaks agent replies as they complete while the thread is open
- * (Settings → Thread behavior → Read Replies Aloud). Only messages that finish after
+ * (Settings → Labs → Read Replies Aloud). Only messages that finish after
  * mount are spoken: opening a thread must not narrate its history, and
  * enabling the preference must not dump the backlog.
  */
@@ -27,6 +27,7 @@ export function useAutoReadAgentReplies(input: {
   const handledIdsRef = useRef<Set<string> | null>(null);
   const spokeRef = useRef(false);
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- Completed replies must synchronize with the external speech engine after commit.
   useEffect(() => {
     const ready: Array<{ readonly id: string; readonly text: string }> = [];
     for (const entry of input.feed) {
@@ -62,6 +63,7 @@ export function useAutoReadAgentReplies(input: {
   }, [enabled, input.feed, input.terminalAssistantMessageIds, input.unsettledRunId]);
 
   // Leaving the thread must not leave the narration running.
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- Leaving the thread must stop narration in the external speech engine.
   useEffect(
     () => () => {
       if (spokeRef.current) {
