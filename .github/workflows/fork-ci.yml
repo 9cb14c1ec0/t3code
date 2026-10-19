@@ -54,6 +54,9 @@ jobs:
       - name: Test
         run: vp run --parallel --concurrency-limit 2 --filter '!t3' --filter '!@t3tools/monorepo' --filter '!@t3tools/web' test
 
+      - name: Install Chromium for web browser tests
+        run: node apps/web/node_modules/playwright/cli.js install --with-deps --only-shell chromium
+
       - name: Test web
         run: vp run --filter @t3tools/web test
 
