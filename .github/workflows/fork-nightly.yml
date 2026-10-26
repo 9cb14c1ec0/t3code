@@ -147,8 +147,6 @@ jobs:
             --target x86_64-unknown-linux-gnu
 
       - name: Build CLI single-executable
-        env:
-          VP_NODE_VERSION: "26.8.2"
         run: node apps/server/scripts/cli.ts build-exe --verbose
 
       - name: Stage resource monitor for the CLI archive
