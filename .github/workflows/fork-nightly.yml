@@ -34,9 +34,12 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - id: check
-        name: Compare HEAD to last nightly tag
+        name: Compare HEAD to last published nightly
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          last_nightly_tag=$(git tag --list 'v*-nightly.*' --sort=-creatordate | head -n 1)
+          last_nightly_tag=$(gh release list --repo "$GITHUB_REPOSITORY" --exclude-drafts --limit 100 \
+            --json tagName --jq '[.[] | .tagName | select(test("^v.*-nightly\\."))][0] // empty')
           if [[ -z "$last_nightly_tag" ]]; then
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
             exit 0
@@ -56,6 +59,8 @@ jobs:
       (github.event_name != 'schedule' || needs.check_changes.outputs.has_changes == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: write
     outputs:
       version: ${{ steps.release_meta.outputs.version }}
       tag: ${{ steps.release_meta.outputs.tag }}
@@ -88,6 +93,18 @@ jobs:
             --run-number "${{ github.run_number }}" \
             --sha "${{ github.sha }}" \
             --github-output
+
+      # Keep the build commit referenced if main is rebased before publication.
+      - name: Reserve nightly tag
+        env:
+          NIGHTLY_TAG: ${{ steps.release_meta.outputs.tag }}
+        run: |
+          if git show-ref --verify --quiet "refs/tags/$NIGHTLY_TAG"; then
+            test "$(git rev-parse "$NIGHTLY_TAG^{commit}")" = "$GITHUB_SHA"
+          else
+            git tag "$NIGHTLY_TAG" "$GITHUB_SHA"
+          fi
+          git push origin "refs/tags/$NIGHTLY_TAG"
 
   # Windows embeds the Linux CLI archive as the WSL runtime (same as
   # upstream release-desktop.yml). Built on ubuntu-latest, not a node-pty
@@ -488,7 +505,6 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.preflight.outputs.tag }}
-          target_commitish: ${{ needs.preflight.outputs.ref }}
           name: ${{ needs.preflight.outputs.release_name }}
           generate_release_notes: true
           prerelease: true
